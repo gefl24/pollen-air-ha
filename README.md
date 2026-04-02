@@ -14,9 +14,9 @@ It is designed for lightweight self-hosted deployment and Home Assistant integra
 
 ## Current API output
 
-`GET /api/current`
+### `GET /api/current`
 
-Returns a JSON payload including:
+Returns the full raw-ish normalized payload including:
 - `location`
 - `air.aqi`
 - `air.category`
@@ -26,6 +26,26 @@ Returns a JSON payload including:
 - `pollen.ragweed`
 - `pollen.mold`
 - `uv_index`
+- `forecast.daily`
+
+### `GET /api/ha/current`
+
+Returns a flatter Home Assistant-friendly payload including:
+- `meta.updated_at`
+- `location.city`
+- `location.region`
+- `air.aqi`
+- `air.category`
+- `air.primary_pollutant`
+- `uv.value`
+- `pollen.grass_value`
+- `pollen.grass_category`
+- `pollen.tree_value`
+- `pollen.tree_category`
+- `pollen.ragweed_value`
+- `pollen.ragweed_category`
+- `pollen.mold_value`
+- `pollen.mold_category`
 - `forecast.daily`
 
 ## Example use cases
@@ -65,6 +85,7 @@ Then fill in the required values.
 - `Dockerfile` — container build
 - `docker-compose.yml` — local deployment
 - `.env.example` — example environment variables
+- `examples/home-assistant/packages/pollen_air.yaml` — Home Assistant package example
 
 ## GitHub Actions
 

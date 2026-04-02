@@ -144,6 +144,60 @@ def fetch_forecast_data(lat, lon):
     }
 
 
+def build_ha_payload():
+    location = cache.get("location") or {}
+    air = cache.get("air") or {}
+    pollen = cache.get("pollen") or {}
+    forecast = cache.get("forecast") or {}
+
+    grass = pollen.get("grass") or {}
+    tree = pollen.get("tree") or {}
+    ragweed = pollen.get("ragweed") or {}
+    mold = pollen.get("mold") or {}
+
+    return {
+        "meta": {
+            "service": "pollen-air-ha",
+            "source": FORECAST_SOURCE,
+            "updated_at": cache.get("updated_at"),
+            "errors": cache.get("errors", []),
+        },
+        "location": {
+            "name": location.get("name"),
+            "city": location.get("city"),
+            "region": location.get("state"),
+            "country": location.get("country"),
+            "lat": location.get("lat"),
+            "lon": location.get("lon"),
+        },
+        "air": {
+            "aqi": air.get("aqi"),
+            "category": air.get("category"),
+            "category_value": air.get("category_value"),
+            "primary_pollutant": air.get("primary_pollutant"),
+        },
+        "uv": {
+            "value": (cache.get("uv_index") or {}).get("value"),
+            "category": (cache.get("uv_index") or {}).get("category"),
+            "category_value": (cache.get("uv_index") or {}).get("category_value"),
+        },
+        "pollen": {
+            "grass_value": grass.get("value"),
+            "grass_category": grass.get("category"),
+            "tree_value": tree.get("value"),
+            "tree_category": tree.get("category"),
+            "ragweed_value": ragweed.get("value"),
+            "ragweed_category": ragweed.get("category"),
+            "mold_value": mold.get("value"),
+            "mold_category": mold.get("category"),
+        },
+        "forecast": {
+            "headline": forecast.get("headline", {}).get("Text"),
+            "daily": forecast.get("daily") or [],
+        },
+    }
+
+
 def refresh_once():
     errors = []
     location_info = None
@@ -173,6 +227,7 @@ def refresh_once():
     cache["forecast"] = forecast
     cache["air"] = forecast.get("air") if forecast else None
     cache["pollen"] = forecast.get("pollen") if forecast else None
+    cache["uv_index"] = forecast.get("uv_index") if forecast else None
     cache["updated_at"] = now_iso()
     cache["errors"] = errors
 
@@ -207,7 +262,7 @@ def index():
         {
             "service": "pollen-air-ha",
             "source": FORECAST_SOURCE,
-            "endpoints": ["/health", "/api/current"],
+            "endpoints": ["/health", "/api/current", "/api/ha/current"],
         }
     )
 
@@ -231,6 +286,11 @@ def health():
 @app.route("/api/current")
 def current():
     return jsonify(cache)
+
+
+@app.route("/api/ha/current")
+def ha_current():
+    return jsonify(build_ha_payload())
 
 
 if __name__ == "__main__":
