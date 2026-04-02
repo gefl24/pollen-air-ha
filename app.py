@@ -2,11 +2,13 @@ import os
 import time
 import threading
 import json
+import html
 import re
+from pathlib import Path
 from datetime import datetime, timezone
 
 import requests
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request, Response, send_from_directory
 
 app = Flask(__name__)
 
@@ -39,6 +41,127 @@ _worker_started = False
 _worker_lock = threading.Lock()
 _city_mapping = None
 _cdfcz_city_mapping = None
+CONFIG_PATH = Path(os.getenv("UI_CONFIG_PATH", "data/ui_config.json"))
+DEFAULT_UI_CONFIG = {
+    "api_base_url": "",
+    "ha_base_url": "",
+    "ha_token": "",
+    "xiaoai_entity_id": "text.xiaomi_lx06_e165_play_text",
+    "schedule_enabled": False,
+    "schedule_time": "07:30",
+    "workdays_only": False,
+    "broadcast_template": "早上好，{city}今天花粉风险{pollen_level}，花粉数值{pollen_score}。{pollen_message} 空气质量{air_category_cn}，AQI {aqi}。{window_advice}{mask_advice}",
+}
+
+
+def ensure_parent_dir(path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def load_ui_config():
+    if not CONFIG_PATH.exists():
+        return DEFAULT_UI_CONFIG.copy()
+    try:
+        data = json.loads(CONFIG_PATH.read_text())
+        cfg = DEFAULT_UI_CONFIG.copy()
+        cfg.update({k: v for k, v in data.items() if k in DEFAULT_UI_CONFIG})
+        return cfg
+    except Exception:
+        return DEFAULT_UI_CONFIG.copy()
+
+
+def save_ui_config(cfg):
+    ensure_parent_dir(CONFIG_PATH)
+    merged = DEFAULT_UI_CONFIG.copy()
+    merged.update({k: v for k, v in cfg.items() if k in DEFAULT_UI_CONFIG})
+    CONFIG_PATH.write_text(json.dumps(merged, ensure_ascii=False, indent=2))
+    return merged
+
+
+def config_public_view(cfg):
+    data = dict(cfg)
+    token = data.get("ha_token") or ""
+    data["ha_token"] = "***" if token else ""
+    data["ha_token_configured"] = bool(token)
+    return data
+
+
+def build_broadcast_message(payload, cfg):
+    pollen = payload.get("pollen") or {}
+    air = payload.get("air") or {}
+    location = payload.get("location") or {}
+    air_cn_map = {
+        "Good": "优",
+        "Moderate": "良",
+        "Unhealthy for Sensitive Groups": "轻度污染",
+        "Unhealthy": "中度污染",
+        "Very Unhealthy": "重度污染",
+        "Hazardous": "严重污染",
+    }
+    values = {
+        "city": location.get("city") or location.get("name") or "本地",
+        "pollen_level": pollen.get("level") or "未知",
+        "pollen_score": pollen.get("hf_num") if pollen.get("hf_num") is not None else "暂无",
+        "pollen_message": pollen.get("level_message") or "暂无花粉提示。",
+        "aqi": air.get("aqi") if air.get("aqi") is not None else "暂无",
+        "air_category_cn": air_cn_map.get(air.get("category"), air.get("category") or "未知"),
+        "window_advice": "今天可以适当开窗通风。" if pollen.get("open_window_recommended") is True else "今天不建议长时间开窗。",
+        "mask_advice": "易敏人群出门建议戴口罩。" if pollen.get("mask_recommended") is True else "",
+    }
+    template = cfg.get("broadcast_template") or DEFAULT_UI_CONFIG["broadcast_template"]
+    try:
+        message = template.format(**values)
+    except Exception:
+        message = DEFAULT_UI_CONFIG["broadcast_template"].format(**values)
+    return re.sub(r"\s+", " ", message).strip()
+
+
+def call_home_assistant_service(cfg, message):
+    base_url = (cfg.get("ha_base_url") or "").rstrip("/")
+    token = cfg.get("ha_token") or ""
+    entity_id = cfg.get("xiaoai_entity_id") or ""
+    if not base_url:
+        raise ValueError("ha_base_url is required")
+    if not token:
+        raise ValueError("ha_token is required")
+    if not entity_id:
+        raise ValueError("xiaoai_entity_id is required")
+    resp = requests.post(
+        f"{base_url}/api/services/text/set_value",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json={"entity_id": entity_id, "value": message},
+        timeout=REQUEST_TIMEOUT,
+    )
+    resp.raise_for_status()
+    try:
+        return resp.json()
+    except Exception:
+        return {"status": resp.status_code, "text": resp.text}
+
+
+def sanitize_ui_payload(data, current=None):
+    current = current or load_ui_config()
+    cleaned = current.copy()
+    cleaned["api_base_url"] = str((data.get("api_base_url") or current.get("api_base_url") or "")).strip()
+    cleaned["ha_base_url"] = str((data.get("ha_base_url") or current.get("ha_base_url") or "")).strip()
+    token = data.get("ha_token")
+    if token:
+        cleaned["ha_token"] = str(token).strip()
+    cleaned["xiaoai_entity_id"] = str((data.get("xiaoai_entity_id") or current.get("xiaoai_entity_id") or "")).strip()
+    cleaned["schedule_enabled"] = bool(data.get("schedule_enabled"))
+    cleaned["schedule_time"] = str((data.get("schedule_time") or current.get("schedule_time") or "07:30")).strip()[:5]
+    cleaned["workdays_only"] = bool(data.get("workdays_only"))
+    cleaned["broadcast_template"] = str((data.get("broadcast_template") or current.get("broadcast_template") or DEFAULT_UI_CONFIG["broadcast_template"])).strip()
+    return cleaned
+
+
+def fetch_current_payload_for_ui(cfg):
+    base_url = (cfg.get("api_base_url") or "").rstrip("/")
+    if base_url:
+        resp = requests.get(f"{base_url}/api/ha/current", timeout=REQUEST_TIMEOUT, headers={"Accept": "application/json"})
+        resp.raise_for_status()
+        return resp.json()
+    return build_ha_payload()
 
 
 def now_iso():
@@ -469,6 +592,7 @@ def build_ha_payload():
     tree = pollen.get("tree") or {}
     ragweed = pollen.get("ragweed") or {}
     mold = pollen.get("mold") or {}
+    risk_helpers = derive_pollen_risk_helpers(pollen)
 
     return {
         "meta": {
@@ -643,6 +767,40 @@ def index():
             "endpoints": ["/health", "/api/current", "/api/ha/current"],
         }
     )
+
+
+@app.route("/ui")
+def ui_console():
+    return send_from_directory("templates", "ui.html")
+
+
+@app.route("/api/ui/config", methods=["GET"])
+def api_ui_config_get():
+    return jsonify(config_public_view(load_ui_config()))
+
+
+@app.route("/api/ui/config", methods=["POST"])
+def api_ui_config_save():
+    data = request.get_json(silent=True) or {}
+    cfg = sanitize_ui_payload(data)
+    save_ui_config(cfg)
+    return jsonify({"ok": True, "config": config_public_view(cfg), "schedule_hint": sync_schedule_to_config_yaml(cfg)})
+
+
+@app.route("/api/ui/test-broadcast", methods=["POST"])
+def api_ui_test_broadcast():
+    incoming = request.get_json(silent=True) or {}
+    current = load_ui_config()
+    cfg = sanitize_ui_payload(incoming, current=current)
+    if incoming:
+        save_ui_config(cfg)
+    try:
+        payload = fetch_current_payload_for_ui(cfg)
+        message = build_broadcast_message(payload, cfg)
+        result = call_home_assistant_service(cfg, message)
+        return jsonify({"ok": True, "message": message, "result": result})
+    except Exception as e:
+        return jsonify({"ok": False, "error": "broadcast test failed", "message": str(e)}), 400
 
 
 @app.route("/health")

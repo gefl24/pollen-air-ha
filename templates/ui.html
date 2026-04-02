@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pollen Air HA Console</title>
+  <style>
+    :root { --bg:#0b1020; --card:#121932; --muted:#95a1c3; --text:#eef2ff; --line:#283252; --primary:#7c9cff; --ok:#35c46b; --danger:#ff6b6b; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,system-ui,sans-serif; background:linear-gradient(180deg,#0a1022,#111831); color:var(--text); }
+    .wrap { max-width:980px; margin:0 auto; padding:24px; }
+    .hero { margin-bottom:20px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+    .card { background:rgba(18,25,50,.92); border:1px solid var(--line); border-radius:18px; padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.18); }
+    h1,h2 { margin:0 0 10px; }
+    p { color:var(--muted); }
+    label { display:block; font-size:14px; color:#cdd6f7; margin:12px 0 6px; }
+    input, textarea { width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:#0d1430; color:var(--text); }
+    textarea { min-height:120px; resize:vertical; }
+    .row { display:flex; gap:10px; align-items:center; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+    button { border:0; border-radius:12px; padding:12px 16px; font-weight:700; cursor:pointer; }
+    .primary { background:var(--primary); color:#0b1020; }
+    .ghost { background:#1a2344; color:var(--text); border:1px solid var(--line); }
+    .status { margin-top:10px; font-size:14px; }
+    .ok { color:var(--ok); }
+    .err { color:var(--danger); }
+    .badge { display:inline-block; padding:4px 10px; border-radius:999px; background:#1a2344; color:#cdd6f7; font-size:12px; }
+    code { background:#0d1430; padding:2px 6px; border-radius:8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <h1>Pollen Air HA Console</h1>
+      <p>设 API、设小爱、设定时，顺手还能直接测一把语音播报。</p>
+      <span id="tokenBadge" class="badge">Token已配置：未知</span>
+    </div>
+    <div class="grid">
+      <section class="card">
+        <h2>基础配置</h2>
+        <label>服务 API 地址</label>
+        <input id="api_base_url" placeholder="http://192.168.1.20:8080" />
+        <label>Home Assistant 地址</label>
+        <input id="ha_base_url" placeholder="http://homeassistant.local:8123" />
+        <label>Home Assistant Token</label>
+        <input id="ha_token" value="" placeholder="留空表示不修改已保存 token" />
+        <label>小爱 text 实体 ID</label>
+        <input id="xiaoai_entity_id" placeholder="text.xiaomi_lx06_e165_play_text" />
+      </section>
+      <section class="card">
+        <h2>定时播报</h2>
+        <div class="row"><input id="schedule_enabled" type="checkbox" style="width:auto" /><label for="schedule_enabled" style="margin:0">启用每日播报</label></div>
+        <label>播报时间</label>
+        <input id="schedule_time" type="time" value="07:30" />
+        <div class="row"><input id="workdays_only" type="checkbox" style="width:auto" /><label for="workdays_only" style="margin:0">仅工作日播报</label></div>
+        <label>播报模板</label>
+        <textarea id="broadcast_template"></textarea>
+        <p>可用变量：<code>{city}</code> <code>{pollen_level}</code> <code>{pollen_score}</code> <code>{pollen_message}</code> <code>{air_category_cn}</code> <code>{aqi}</code> <code>{window_advice}</code> <code>{mask_advice}</code></p>
+      </section>
+    </div>
+    <section class="card" style="margin-top:16px;">
+      <h2>操作</h2>
+      <div class="actions">
+        <button class="primary" onclick="saveConfig()">保存配置</button>
+        <button class="ghost" onclick="testBroadcast()">立即发送语音</button>
+        <button class="ghost" onclick="loadConfig()">重新读取</button>
+      </div>
+      <div id="status" class="status"></div>
+    </section>
+  </div>
+<script>
+function payload() {
+  return {
+    api_base_url: document.getElementById('api_base_url').value.trim(),
+    ha_base_url: document.getElementById('ha_base_url').value.trim(),
+    ha_token: document.getElementById('ha_token').value,
+    xiaoai_entity_id: document.getElementById('xiaoai_entity_id').value.trim(),
+    schedule_enabled: document.getElementById('schedule_enabled').checked,
+    schedule_time: document.getElementById('schedule_time').value,
+    workdays_only: document.getElementById('workdays_only').checked,
+    broadcast_template: document.getElementById('broadcast_template').value,
+  };
+}
+function show(msg, ok=true) {
+  const el = document.getElementById('status');
+  el.className = 'status ' + (ok ? 'ok' : 'err');
+  el.textContent = msg;
+}
+function fill(data) {
+  document.getElementById('api_base_url').value = data.api_base_url || '';
+  document.getElementById('ha_base_url').value = data.ha_base_url || '';
+  document.getElementById('ha_token').value = '';
+  document.getElementById('xiaoai_entity_id').value = data.xiaoai_entity_id || '';
+  document.getElementById('schedule_enabled').checked = !!data.schedule_enabled;
+  document.getElementById('schedule_time').value = data.schedule_time || '07:30';
+  document.getElementById('workdays_only').checked = !!data.workdays_only;
+  document.getElementById('broadcast_template').value = data.broadcast_template || '';
+  document.getElementById('tokenBadge').textContent = 'Token已配置：' + (data.ha_token_configured ? '是' : '否');
+}
+async function loadConfig() {
+  const res = await fetch('/api/ui/config');
+  const data = await res.json();
+  if (!res.ok) return show(data.error || '读取失败', false);
+  fill(data);
+  show('配置已重新读取');
+}
+async function saveConfig() {
+  const res = await fetch('/api/ui/config', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload()) });
+  const data = await res.json();
+  if (!res.ok) return show(data.error || '保存失败', false);
+  fill(data.config || {});
+  show('配置已保存');
+}
+async function testBroadcast() {
+  const res = await fetch('/api/ui/test-broadcast', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload()) });
+  const data = await res.json();
+  if (!res.ok) return show((data.error || '测试失败') + (data.message ? '：' + data.message : ''), false);
+  show('已发送：' + (data.message || 'ok'));
+}
+loadConfig();
+</script>
+</body>
+</html>
