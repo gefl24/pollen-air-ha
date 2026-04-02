@@ -2,7 +2,11 @@
 
 Hohhot pollen and air quality service, with a Home Assistant-friendly JSON API.
 
-## What it does
+[![Docker Image](https://github.com/gefl24/pollen-air-ha/actions/workflows/docker-image.yml/badge.svg)](https://github.com/gefl24/pollen-air-ha/actions/workflows/docker-image.yml)
+[![Release](https://img.shields.io/github/v/release/gefl24/pollen-air-ha)](https://github.com/gefl24/pollen-air-ha/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+
+## Overview
 
 This service aggregates:
 - Air quality data
@@ -10,13 +14,50 @@ This service aggregates:
 - UV index
 - Daily forecast data
 
-It is designed for lightweight self-hosted deployment and Home Assistant integration.
+It is designed for lightweight self-hosted deployment and direct Home Assistant integration.
 
-## Current API output
+## Table of contents
+
+- [Quick start](#quick-start)
+- [Docker image](#docker-image)
+- [API endpoints](#api-endpoints)
+- [Home Assistant docs](#home-assistant-docs)
+- [Project files](#project-files)
+- [GitHub Actions](#github-actions)
+- [Release / tag](#release--tag)
+
+## Quick start
+
+### Run with Docker Compose
+
+```bash
+docker compose up -d --build
+```
+
+Then access:
+
+```bash
+curl http://localhost:8080/api/current
+curl http://localhost:8080/api/ha/current
+```
+
+## Docker image
+
+GitHub Actions will publish the image to GHCR:
+
+```bash
+docker pull ghcr.io/gefl24/pollen-air-ha:latest
+```
+
+You can also use the included `docker-compose.yml` directly.
+
+## API endpoints
+
+### `GET /health`
+Health status endpoint.
 
 ### `GET /api/current`
-
-Returns the full raw-ish normalized payload including:
+Returns the fuller normalized payload including:
 - `location`
 - `air.aqi`
 - `air.category`
@@ -29,7 +70,6 @@ Returns the full raw-ish normalized payload including:
 - `forecast.daily`
 
 ### `GET /api/ha/current`
-
 Returns a flatter Home Assistant-friendly payload including:
 - `meta.updated_at`
 - `location.city`
@@ -48,26 +88,13 @@ Returns a flatter Home Assistant-friendly payload including:
 - `pollen.mold_category`
 - `forecast.daily`
 
-## Example use cases
+## Home Assistant docs
 
-- Home Assistant REST sensor
-- Local dashboard widget
-- Personal allergy monitoring
-- Self-hosted environmental status endpoint
+- Full guide: [docs/HOME_ASSISTANT.md](docs/HOME_ASSISTANT.md)
+- Example package: [examples/home-assistant/packages/pollen_air.yaml](examples/home-assistant/packages/pollen_air.yaml)
 
-## Quick start
-
-### Run with Docker Compose
-
-```bash
-docker compose up -d --build
-```
-
-Then access:
-
-```bash
-curl http://localhost:8080/api/current
-```
+If you want direct GitHub-viewable setup instructions, start here:
+- [Home Assistant Integration Guide](docs/HOME_ASSISTANT.md)
 
 ## Configuration
 
@@ -79,21 +106,22 @@ cp .env.example .env
 
 Then fill in the required values.
 
-## Files
+## Project files
 
 - `app.py` — application entry
 - `Dockerfile` — container build
 - `docker-compose.yml` — local deployment
 - `.env.example` — example environment variables
+- `docs/HOME_ASSISTANT.md` — Home Assistant integration guide
 - `examples/home-assistant/packages/pollen_air.yaml` — Home Assistant package example
 
 ## GitHub Actions
 
 This repository includes a GitHub Actions workflow that:
-- builds the Docker image on pushes to `main`
 - builds on pull requests targeting `main`
-- runs manually via `workflow_dispatch`
-- also builds for version tags like `v0.1.0`
+- builds and publishes a GHCR image on pushes to `main`
+- publishes tagged builds for versions like `v0.1.0`
+- supports manual triggering via `workflow_dispatch`
 
 ## Release / tag
 
@@ -104,11 +132,6 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-## Home Assistant docs
-
-- Full guide: `docs/HOME_ASSISTANT.md`
-- Example package: `examples/home-assistant/packages/pollen_air.yaml`
-
 ## Recommended next step
 
-A cleaner risk/advice layer can be added later for even simpler Home Assistant dashboards and automations.
+A backend risk/advice layer can be added later for even simpler Home Assistant dashboards and automations.
