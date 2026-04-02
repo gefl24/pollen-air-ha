@@ -234,6 +234,32 @@ def sync_helpers_to_ha(cfg):
     }
 
 
+def read_helpers_from_ha(cfg):
+    missing = []
+    result = {"helpers": HA_HELPERS.copy()}
+    try:
+        enabled = get_ha_entity_state(cfg, HA_HELPERS["enabled"])
+        result["schedule_enabled"] = enabled.get("state") == "on"
+    except Exception:
+        missing.append(HA_HELPERS["enabled"])
+    try:
+        time_entity = get_ha_entity_state(cfg, HA_HELPERS["time"])
+        time_value = ((time_entity.get("attributes") or {}).get("timestamp") and None) or time_entity.get("state")
+        if isinstance(time_value, str) and len(time_value) >= 5:
+            result["schedule_time"] = time_value[:5]
+        else:
+            result["schedule_time"] = None
+    except Exception:
+        missing.append(HA_HELPERS["time"])
+    try:
+        template_entity = get_ha_entity_state(cfg, HA_HELPERS["template"])
+        result["broadcast_template"] = template_entity.get("state")
+    except Exception:
+        missing.append(HA_HELPERS["template"])
+    result["missing"] = missing
+    return result
+
+
 def sanitize_ui_payload(data, current=None):
     current = current or load_ui_config()
     cleaned = current.copy()
@@ -949,6 +975,16 @@ def api_ui_sync_helpers():
     try:
         result = sync_helpers_to_ha(cfg)
         return jsonify({"ok": True, "result": result})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+
+@app.route("/api/ui/read-helpers", methods=["GET"])
+def api_ui_read_helpers():
+    cfg = load_ui_config()
+    try:
+        data = read_helpers_from_ha(cfg)
+        return jsonify({"ok": True, "result": data})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
 
