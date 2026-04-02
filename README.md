@@ -1,5 +1,3 @@
-
-````markdown
 # 🍃 Pollen-Air-HA
 
 *Hohhot pollen and air quality service, with a Home Assistant-friendly JSON API.*
@@ -38,7 +36,6 @@ Before running the service, copy the example environment file and fill in your r
 
 ```bash
 cp .env.example .env
-````
 
 ## 🚀 Quick Start
 
