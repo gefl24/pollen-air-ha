@@ -369,7 +369,6 @@ async function previewHelperPackage(opts = {}) {
 }
 
 async function readHelpers(opts = {}) {
-  const currentTemplate = document.getElementById('broadcast_template').value;
   const res = await fetch('/api/ui/read-helpers');
   const data = await res.json();
   if (!res.ok) return show('Helper 读取失败', false);
@@ -378,11 +377,6 @@ async function readHelpers(opts = {}) {
     missing = data.result.missing || [];
     if (typeof data.result.schedule_enabled === 'boolean') document.getElementById('schedule_enabled').checked = data.result.schedule_enabled;
     if (data.result.schedule_time) document.getElementById('schedule_time').value = data.result.schedule_time;
-    if (typeof data.result.broadcast_template === 'string' && data.result.broadcast_template.trim()) {
-      document.getElementById('broadcast_template').value = data.result.broadcast_template;
-    } else {
-      document.getElementById('broadcast_template').value = currentTemplate;
-    }
   }
   if (missing.length) return show('HA 里缺 helper：' + missing.join(', '), false);
   if (!opts.silent) show('已从 HA 同步状态');
@@ -391,12 +385,15 @@ async function readHelpers(opts = {}) {
 async function syncHelpers() {
   show('正在同步数据...');
   const currentTemplate = document.getElementById('broadcast_template').value;
-  const res = await fetch('/api/ui/sync-helpers', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload()) });
+  const res = await fetch('/api/ui/sync-helpers', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload())
+  });
   if (!res.ok) return show('同步失败', false);
-  document.getElementById('broadcast_template').value = currentTemplate;
   await checkHaStatus();
   await readHelpers({ silent: true });
-  if (!document.getElementById('broadcast_template').value.trim()) {
+  if (currentTemplate) {
     document.getElementById('broadcast_template').value = currentTemplate;
   }
   show('成功同步至 HA Helper');
