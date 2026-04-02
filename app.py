@@ -377,7 +377,10 @@ def refresh_once():
     forecast = merge_forecast(primary_forecast, fallback_forecast) if (primary_forecast or fallback_forecast) else None
 
     city_name = LOCATION_NAME
-    if weather_cn_meta and weather_cn_meta.get("city"):
+    weather_cn_city = get_weather_cn_city(CITY_ID)
+    if weather_cn_city and weather_cn_city.get("cn"):
+        city_name = weather_cn_city.get("cn")
+    elif weather_cn_meta and weather_cn_meta.get("city"):
         city_name = weather_cn_meta.get("city")
     elif location_info and location_info.get("city"):
         city_name = location_info.get("city")
