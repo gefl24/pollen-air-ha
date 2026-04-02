@@ -139,6 +139,60 @@ def call_home_assistant_service(cfg, message):
         return {"status": resp.status_code, "text": resp.text}
 
 
+def ha_request(cfg, method, path, json_body=None):
+    base_url = (cfg.get("ha_base_url") or "").rstrip("/")
+    token = cfg.get("ha_token") or ""
+    if not base_url:
+        raise ValueError("ha_base_url is required")
+    if not token:
+        raise ValueError("ha_token is required")
+    resp = requests.request(
+        method,
+        f"{base_url}{path}",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json=json_body,
+        timeout=REQUEST_TIMEOUT,
+    )
+    resp.raise_for_status()
+    if resp.text.strip():
+        try:
+            return resp.json()
+        except Exception:
+            return {"raw": resp.text}
+    return {}
+
+
+def get_ha_entity_state(cfg, entity_id):
+    return ha_request(cfg, "GET", f"/api/states/{entity_id}")
+
+
+def check_ha_status(cfg):
+    entity_id = cfg.get("xiaoai_entity_id") or ""
+    result = {
+        "connected": False,
+        "ha_base_url": (cfg.get("ha_base_url") or "").rstrip("/"),
+        "entity_id": entity_id,
+        "entity_exists": False,
+        "entity_state": None,
+        "error": None,
+    }
+    try:
+        ha_request(cfg, "GET", "/api/")
+        result["connected"] = True
+    except Exception as e:
+        result["error"] = str(e)
+        return result
+    if entity_id:
+        try:
+            entity = get_ha_entity_state(cfg, entity_id)
+            result["entity_exists"] = True
+            result["entity_state"] = entity.get("state")
+            result["entity"] = entity
+        except Exception as e:
+            result["error"] = f"entity check failed: {e}"
+    return result
+
+
 def sanitize_ui_payload(data, current=None):
     current = current or load_ui_config()
     cleaned = current.copy()
@@ -825,6 +879,15 @@ def api_ui_test_broadcast():
 def api_ui_package_preview():
     cfg = load_ui_config()
     return Response(build_ha_package_yaml(cfg), mimetype="text/plain; charset=utf-8")
+
+
+@app.route("/api/ui/ha-status", methods=["GET"])
+def api_ui_ha_status():
+    cfg = load_ui_config()
+    try:
+        return jsonify({"ok": True, "status": check_ha_status(cfg)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
 
 
 @app.route("/health")

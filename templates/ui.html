@@ -65,10 +65,12 @@
         <button class="primary" onclick="saveConfig()">保存配置</button>
         <button class="ghost" onclick="testBroadcast()">立即发送语音</button>
         <button class="ghost" onclick="previewPackage()">预览 HA 配置</button>
+        <button class="ghost" onclick="checkHaStatus()">检查 HA 连接</button>
         <button class="ghost" onclick="loadConfig()">重新读取</button>
       </div>
       <textarea id="packagePreview" placeholder="这里会显示可直接复制到 HA 的 package 配置"></textarea>
       <div id="status" class="status"></div>
+      <pre id="haStatus" style="margin-top:12px;background:#0d1430;padding:12px;border-radius:12px;border:1px solid #283252;color:#cdd6f7;white-space:pre-wrap;word-break:break-word;"></pre>
     </section>
   </div>
 <script>
@@ -127,7 +129,15 @@ async function previewPackage() {
   document.getElementById('packagePreview').value = text;
   show('HA 配置已生成，直接复制就行');
 }
+async function checkHaStatus() {
+  const res = await fetch('/api/ui/ha-status');
+  const data = await res.json();
+  if (!res.ok) return show(data.error || '检查失败', false);
+  document.getElementById('haStatus').textContent = JSON.stringify(data.status || data, null, 2);
+  show((data.status && data.status.connected) ? 'HA 连接正常' : 'HA 连接异常', !!(data.status && data.status.connected));
+}
 loadConfig();
+checkHaStatus();
 </script>
 </body>
 </html>
