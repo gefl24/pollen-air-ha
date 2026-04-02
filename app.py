@@ -16,7 +16,7 @@ REFRESH_SECONDS = int(os.getenv("REFRESH_SECONDS", "1800"))
 REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "20"))
 FORECAST_SOURCE = os.getenv("FORECAST_SOURCE", "api.cdfcz.com")
 LOCATION_NAME = os.getenv("LOCATION_NAME", "Hohhot")
-CITY_ID = os.getenv("CITY_ID", "101081101")
+CITY_ID = os.getenv("CITY_ID", "101080101")
 QWEATHER_KEY = os.getenv("QWEATHER_KEY", "")
 QWEATHER_LOCATION = os.getenv("QWEATHER_LOCATION", "101080101")
 
@@ -38,6 +38,7 @@ cache = {
 _worker_started = False
 _worker_lock = threading.Lock()
 _city_mapping = None
+_cdfcz_city_mapping = None
 
 
 def now_iso():
@@ -250,6 +251,31 @@ def get_weather_cn_city(city_id):
     raise ValueError(f"city id not found in weather.com.cn flower city mapping: {city_id}")
 
 
+def get_cdfcz_city_mapping():
+    global _cdfcz_city_mapping
+    if _cdfcz_city_mapping is not None:
+        return _cdfcz_city_mapping
+
+    resp = requests.get(
+        "https://api.cdfcz.com/huafen/getCityList",
+        params={"app": "fcwhservice", "channel": "h5", "platform": "h5"},
+        headers={"User-Agent": "Mozilla/5.0"},
+        timeout=REQUEST_TIMEOUT,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    result = data.get("result") or []
+    _cdfcz_city_mapping = result
+    return _cdfcz_city_mapping
+
+
+def get_cdfcz_city(city_id):
+    for item in get_cdfcz_city_mapping():
+        if str(item.get("id")) == str(city_id):
+            return item
+    raise ValueError(f"city id not found in cdfcz city mapping: {city_id}")
+
+
 def fetch_weather_cn_city_meta(city_id):
     resp = requests.get(
         f"https://d1.weather.com.cn/weather_index/{city_id}.html",
@@ -275,7 +301,7 @@ def parse_jsonp(text, callback_name="callback"):
 
 
 def fetch_cdfcz_pollen(city_id):
-    city = get_weather_cn_city(city_id)
+    city = get_cdfcz_city(city_id)
     today = datetime.now(timezone.utc).date().isoformat()
     params = {
         "eletype": "1",
@@ -340,7 +366,7 @@ def fetch_cdfcz_pollen(city_id):
 
 
 def fetch_cdfcz_pollen(city_id):
-    city = get_weather_cn_city(city_id)
+    city = get_cdfcz_city(city_id)
     params = {
         "city": city["en"],
         "app": "fcwhservice",
@@ -525,13 +551,20 @@ def refresh_once():
     forecast = merge_forecast(primary_forecast, fallback_forecast) if (primary_forecast or fallback_forecast) else None
 
     city_name = LOCATION_NAME
-    weather_cn_city = get_weather_cn_city(CITY_ID)
-    if weather_cn_city and weather_cn_city.get("cn"):
-        city_name = weather_cn_city.get("cn")
-    elif weather_cn_meta and weather_cn_meta.get("city"):
-        city_name = weather_cn_meta.get("city")
-    elif location_info and location_info.get("city"):
-        city_name = location_info.get("city")
+    if FORECAST_SOURCE == "api.cdfcz.com":
+        city_info = get_cdfcz_city(CITY_ID)
+        if city_info and city_info.get("city"):
+            city_name = city_info.get("city")
+        elif location_info and location_info.get("city"):
+            city_name = location_info.get("city")
+    else:
+        weather_cn_city = get_weather_cn_city(CITY_ID)
+        if weather_cn_city and weather_cn_city.get("cn"):
+            city_name = weather_cn_city.get("cn")
+        elif weather_cn_meta and weather_cn_meta.get("city"):
+            city_name = weather_cn_meta.get("city")
+        elif location_info and location_info.get("city"):
+            city_name = location_info.get("city")
 
     cache["location"] = {
         "name": city_name,
