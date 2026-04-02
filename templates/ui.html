@@ -114,12 +114,17 @@ async function loadConfig() {
   fill(data);
   show('配置已重新读取');
 }
-async function saveConfig() {
-  const res = await fetch('/api/ui/config', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload()) });
+async function saveConfig(opts = {}) {
+  const current = payload();
+  const res = await fetch('/api/ui/config', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(current) });
   const data = await res.json();
-  if (!res.ok) return show(data.error || '保存失败', false);
-  fill(data.config || {});
-  show('配置已保存');
+  if (!res.ok) {
+    show(data.error || '保存失败', false);
+    return null;
+  }
+  fill({ ...(data.config || {}), ...current, ha_token_configured: (data.config || {}).ha_token_configured });
+  if (!opts.silent) show('配置已保存');
+  return data;
 }
 async function testBroadcast() {
   const res = await fetch('/api/ui/test-broadcast', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload()) });
@@ -128,17 +133,23 @@ async function testBroadcast() {
   show('已发送：' + (data.message || 'ok'));
 }
 async function previewPackage() {
-  await saveConfig();
+  const saved = await saveConfig({ silent: true });
+  if (!saved) return;
+  const currentTemplate = document.getElementById('broadcast_template').value;
   const res = await fetch('/api/ui/package-preview');
   const text = await res.text();
   document.getElementById('packagePreview').value = text;
+  document.getElementById('broadcast_template').value = currentTemplate;
   show('HA 配置已生成，直接复制就行');
 }
 async function previewHelperPackage() {
-  await saveConfig();
+  const saved = await saveConfig({ silent: true });
+  if (!saved) return;
+  const currentTemplate = document.getElementById('broadcast_template').value;
   const res = await fetch('/api/ui/helper-package-preview');
   const text = await res.text();
   document.getElementById('helperYamlPreview').value = text;
+  document.getElementById('broadcast_template').value = currentTemplate;
   show('Helper YAML 已生成，缺 helper 就把这段丢进 HA');
 }
 async function readHelpers() {
