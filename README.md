@@ -104,6 +104,11 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
+## Home Assistant docs
+
+- Full guide: `docs/HOME_ASSISTANT.md`
+- Example package: `examples/home-assistant/packages/pollen_air.yaml`
+
 ## Recommended next step
 
-A cleaner `/api/ha/current` endpoint can be added later to flatten fields for easier Home Assistant templating.
+A cleaner risk/advice layer can be added later for even simpler Home Assistant dashboards and automations.
