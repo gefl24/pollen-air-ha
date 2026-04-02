@@ -8,6 +8,8 @@ services:
       LOCATION_NAME: "Hohhot"
       LAT: "40.8426"
       LON: "111.7492"
+      CITY_ID: "101081101"
+      FORECAST_SOURCE: "weather.com.cn"
       REFRESH_SECONDS: "1800"
       REQUEST_TIMEOUT: "20"
     ports:
