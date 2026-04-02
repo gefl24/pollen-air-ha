@@ -55,6 +55,8 @@ DEFAULT_UI_CONFIG = {
     "xiaoai_entity_id": "text.xiaomi_lx06_e165_play_text",
     "schedule_enabled": False,
     "schedule_time": "07:30",
+    "schedule_time_2": "00:00",
+    "schedule_time_3": "00:00",
     "workdays_only": False,
     "broadcast_template": "早上好，{city}今天花粉风险{pollen_level}，花粉数值{pollen_score}。{pollen_message} 空气质量{air_category_cn}，AQI {aqi}。{window_advice}{mask_advice}",
 }
@@ -271,6 +273,8 @@ def sanitize_ui_payload(data, current=None):
     cleaned["xiaoai_entity_id"] = str((data.get("xiaoai_entity_id") or current.get("xiaoai_entity_id") or "")).strip()
     cleaned["schedule_enabled"] = bool(data.get("schedule_enabled"))
     cleaned["schedule_time"] = str((data.get("schedule_time") or current.get("schedule_time") or "07:30")).strip()[:5]
+    cleaned["schedule_time_2"] = str((data.get("schedule_time_2") or current.get("schedule_time_2") or "00:00")).strip()[:5]
+    cleaned["schedule_time_3"] = str((data.get("schedule_time_3") or current.get("schedule_time_3") or "00:00")).strip()[:5]
     cleaned["workdays_only"] = bool(data.get("workdays_only"))
     cleaned["broadcast_template"] = str((data.get("broadcast_template") or current.get("broadcast_template") or DEFAULT_UI_CONFIG["broadcast_template"])).strip()
     return cleaned
