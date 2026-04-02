@@ -4,81 +4,245 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Pollen Air HA Console</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <style>
-    :root { --bg:#0b1020; --card:#121932; --muted:#95a1c3; --text:#eef2ff; --line:#283252; --primary:#7c9cff; --ok:#35c46b; --danger:#ff6b6b; }
-    * { box-sizing:border-box; }
-    body { margin:0; font-family:Inter,system-ui,sans-serif; background:linear-gradient(180deg,#0a1022,#111831); color:var(--text); }
-    .wrap { max-width:980px; margin:0 auto; padding:24px; }
-    .hero { margin-bottom:20px; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
-    .card { background:rgba(18,25,50,.92); border:1px solid var(--line); border-radius:18px; padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.18); }
-    h1,h2 { margin:0 0 10px; }
-    p { color:var(--muted); }
-    label { display:block; font-size:14px; color:#cdd6f7; margin:12px 0 6px; }
-    input, textarea { width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:#0d1430; color:var(--text); }
-    textarea { min-height:120px; resize:vertical; }
-    .row { display:flex; gap:10px; align-items:center; }
-    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
-    button { border:0; border-radius:12px; padding:12px 16px; font-weight:700; cursor:pointer; }
-    .primary { background:var(--primary); color:#0b1020; }
-    .ghost { background:#1a2344; color:var(--text); border:1px solid var(--line); }
-    .status { margin-top:10px; font-size:14px; }
-    .ok { color:var(--ok); }
-    .err { color:var(--danger); }
-    .badge { display:inline-block; padding:4px 10px; border-radius:999px; background:#1a2344; color:#cdd6f7; font-size:12px; }
-    code { background:#0d1430; padding:2px 6px; border-radius:8px; }
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --input-bg: #0f172a;
+      --border: #334155;
+      --primary: #38bdf8;
+      --primary-hover: #0ea5e9;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #818cf8;
+    }
+
+    * { box-sizing: border-box; transition: all 0.2s ease; }
+    body { 
+      margin: 0; 
+      font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+      background-color: var(--bg); 
+      color: var(--text-main);
+      line-height: 1.5;
+    }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 40px 20px; }
+    
+    /* 顶部状态栏 */
+    .header { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      margin-bottom: 32px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header-info h1 { font-size: 24px; font-weight: 700; margin: 0; letter-spacing: -0.5px; }
+    .header-info p { color: var(--text-muted); margin: 4px 0 0; font-size: 14px; }
+    
+    .status-badges { display: flex; gap: 12px; }
+    .badge { 
+      padding: 6px 12px; 
+      border-radius: 8px; 
+      font-size: 12px; 
+      font-weight: 600; 
+      display: flex; 
+      align-items: center; 
+      gap: 6px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+    }
+    .badge.active { border-color: var(--success); color: var(--success); background: rgba(34, 197, 94, 0.1); }
+
+    /* 网格布局 */
+    .grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 24px; }
+    @media (max-width: 850px) { .grid { grid-template-columns: 1fr; } }
+
+    .card { 
+      background: var(--card-bg); 
+      border: 1px solid var(--border); 
+      border-radius: 16px; 
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .card h2 { font-size: 18px; margin-top: 0; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; color: var(--accent); }
+
+    /* 表单控件 */
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 13px; font-weight: 500; color: var(--text-muted); margin-bottom: 8px; }
+    input, textarea { 
+      width: 100%; 
+      padding: 12px 16px; 
+      border-radius: 10px; 
+      border: 1px solid var(--border); 
+      background: var(--input-bg); 
+      color: var(--text-main);
+      font-size: 14px;
+    }
+    input:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.1); }
+    
+    .checkbox-group { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+    input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+
+    /* 操作区 */
+    .actions-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 20px; }
+    button { 
+      padding: 10px 14px; 
+      border-radius: 10px; 
+      font-size: 13px; 
+      font-weight: 600; 
+      cursor: pointer; 
+      border: 1px solid transparent;
+      display: flex; 
+      align-items: center; 
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-primary { background: var(--primary); color: #000; }
+    .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+    .btn-ghost { background: transparent; border-color: var(--border); color: var(--text-main); }
+    .btn-ghost:hover { background: rgba(255,255,255,0.05); border-color: var(--text-muted); }
+
+    /* 预览区 */
+    .preview-box { position: relative; margin-top: 16px; }
+    .preview-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .copy-btn { font-size: 11px; padding: 4px 8px; background: rgba(255,255,255,0.1); border-radius: 4px; color: var(--text-muted); cursor: pointer; border: none; }
+    textarea.code-font { font-family: 'Fira Code', monospace; font-size: 12px; color: #bae6fd; background: #020617; }
+
+    /* 状态通知 */
+    #status { 
+      position: fixed; bottom: 24px; right: 24px; padding: 12px 24px; border-radius: 12px; 
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.4); z-index: 100;
+      display: none; animation: slideIn 0.3s ease-out;
+    }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    .variable-tag { font-size: 11px; background: #1e293b; border: 1px solid var(--border); padding: 2px 6px; border-radius: 4px; color: var(--primary); cursor: pointer; }
+    .variable-tag:hover { border-color: var(--primary); }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="hero">
-      <h1>Pollen Air HA Console</h1>
-      <p>设 API、设小爱、设定时，顺手还能直接测一把语音播报。</p>
-      <span id="tokenBadge" class="badge">Token已配置：未知</span>
-    </div>
-    <div class="grid">
-      <section class="card">
-        <h2>基础配置</h2>
-        <label>服务 API 地址</label>
-        <input id="api_base_url" placeholder="http://192.168.1.20:8080" />
-        <label>Home Assistant 地址</label>
-        <input id="ha_base_url" placeholder="http://homeassistant.local:8123" />
-        <label>Home Assistant Token</label>
-        <input id="ha_token" value="" placeholder="留空表示不修改已保存 token" />
-        <label>小爱 text 实体 ID</label>
-        <input id="xiaoai_entity_id" placeholder="text.xiaomi_lx06_e165_play_text" />
-      </section>
-      <section class="card">
-        <h2>定时播报</h2>
-        <div class="row"><input id="schedule_enabled" type="checkbox" style="width:auto" /><label for="schedule_enabled" style="margin:0">启用每日播报</label></div>
-        <label>播报时间</label>
-        <input id="schedule_time" type="time" value="07:30" />
-        <div class="row"><input id="workdays_only" type="checkbox" style="width:auto" /><label for="workdays_only" style="margin:0">仅工作日播报</label></div>
-        <label>播报模板</label>
-        <textarea id="broadcast_template"></textarea>
-        <p>可用变量：<code>{city}</code> <code>{pollen_level}</code> <code>{pollen_score}</code> <code>{pollen_message}</code> <code>{air_category_cn}</code> <code>{aqi}</code> <code>{window_advice}</code> <code>{mask_advice}</code></p>
-      </section>
-    </div>
-    <section class="card" style="margin-top:16px;">
-      <h2>操作</h2>
-      <div class="actions">
-        <button class="primary" onclick="saveConfig()">保存配置</button>
-        <button class="ghost" onclick="testBroadcast()">立即发送语音</button>
-        <button class="ghost" onclick="previewPackage()">预览 HA 配置</button>
-        <button class="ghost" onclick="previewHelperPackage()">生成 Helper YAML</button>
-        <button class="ghost" onclick="checkHaStatus()">检查 HA 连接</button>
-        <button class="ghost" onclick="syncHelpers()">同步到 HA Helper</button>
-        <button class="ghost" onclick="readHelpers()">读取 HA Helper</button>
-        <button class="ghost" onclick="loadConfig()">重新读取</button>
+  <div class="container">
+    <header class="header">
+      <div class="header-info">
+        <h1>Pollen Air HA Console</h1>
+        <p>花粉与空气质量 Home Assistant 自动化配置中心</p>
       </div>
-      <textarea id="packagePreview" placeholder="这里会显示可直接复制到 HA 的 package 配置"></textarea>
-      <textarea id="helperYamlPreview" placeholder="这里会显示可直接复制到 HA 的 helper YAML" style="margin-top:12px;"></textarea>
-      <div id="status" class="status"></div>
-      <pre id="haStatus" style="margin-top:12px;background:#0d1430;padding:12px;border-radius:12px;border:1px solid #283252;color:#cdd6f7;white-space:pre-wrap;word-break:break-word;"></pre>
-      <pre id="helperStatus" style="margin-top:12px;background:#0d1430;padding:12px;border-radius:12px;border:1px solid #283252;color:#cdd6f7;white-space:pre-wrap;word-break:break-word;"></pre>
-    </section>
+      <div class="status-badges">
+        <div id="tokenBadge" class="badge">Token: 待检测</div>
+        <div id="haConnectionBadge" class="badge">HA: 离线</div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="space-y-6">
+        <section class="card">
+          <h2><span>⚙️</span> 核心服务配置</h2>
+          <div class="form-group">
+            <label>服务 API 基准地址</label>
+            <input id="api_base_url" placeholder="http://192.168.1.20:8080" />
+          </div>
+          <div class="form-group">
+            <label>Home Assistant URL</label>
+            <input id="ha_base_url" placeholder="http://homeassistant.local:8123" />
+          </div>
+          <div class="form-group">
+            <label>HA 长期访问令牌 (Token)</label>
+            <input id="ha_token" type="password" placeholder="••••••••••••••••" />
+          </div>
+          <div class="form-group">
+            <label>小爱 TTS 实体 ID</label>
+            <input id="xiaoai_entity_id" placeholder="text.xiaomi_lx06_e165_play_text" />
+          </div>
+        </section>
+
+        <section class="card">
+          <h2><span>🔔</span> 播报计划</h2>
+          <div class="form-group">
+            <label class="checkbox-group">
+              <input id="schedule_enabled" type="checkbox" />
+              <span>启用每日定时播报</span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label>播报时刻</label>
+            <input id="schedule_time" type="time" value="07:30" />
+          </div>
+          <div class="form-group">
+            <label class="checkbox-group">
+              <input id="workdays_only" type="checkbox" />
+              <span>仅在法定工作日执行</span>
+            </label>
+          </div>
+        </section>
+      </div>
+
+      <div class="space-y-6">
+        <section class="card">
+          <h2><span>📝</span> 播报内容模版</h2>
+          <textarea id="broadcast_template" style="min-height: 160px; margin-bottom: 12px;" placeholder="输入播报话术..."></textarea>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+            <span class="variable-tag" onclick="insertVar('{city}')">{城市}</span>
+            <span class="variable-tag" onclick="insertVar('{pollen_level}')">{花粉等级}</span>
+            <span class="variable-tag" onclick="insertVar('{aqi}')">{AQI}</span>
+            <span class="variable-tag" onclick="insertVar('{window_advice}')">{开窗建议}</span>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2><span>⚡</span> 快速操作</h2>
+          <div class="actions-grid">
+            <button class="btn-primary" onclick="saveConfig()">保存配置</button>
+            <button class="btn-ghost" onclick="testBroadcast()">语音测试</button>
+            <button class="btn-ghost" onclick="syncHelpers()">同步到 HA</button>
+            <button class="btn-ghost" onclick="checkHaStatus()">检查连接</button>
+            <button class="btn-ghost" onclick="readHelpers()">读取 Helper</button>
+            <button class="btn-ghost" onclick="loadConfig()">重载页面</button>
+          </div>
+
+          <div class="preview-box">
+            <div class="preview-header">
+              <label>Package YAML 预览</label>
+              <button class="copy-btn" onclick="copyToClipboard('packagePreview')">复制</button>
+            </div>
+            <textarea id="packagePreview" readonly class="code-font" style="min-height: 100px;"></textarea>
+          </div>
+
+          <div class="preview-box">
+            <div class="preview-header">
+              <label>Helper YAML 预览</label>
+              <button class="copy-btn" onclick="copyToClipboard('helperYamlPreview')">复制</button>
+            </div>
+            <textarea id="helperYamlPreview" readonly class="code-font" style="min-height: 100px;"></textarea>
+          </div>
+        </section>
+      </div>
+    </div>
   </div>
+
+  <div id="status"></div>
+
 <script>
+// 辅助：插入变量到光标处
+function insertVar(val) {
+  const area = document.getElementById('broadcast_template');
+  const start = area.selectionStart;
+  const end = area.selectionEnd;
+  area.value = area.value.substring(0, start) + val + area.value.substring(end);
+  area.focus();
+}
+
+// 辅助：复制到剪贴板
+function copyToClipboard(id) {
+  const text = document.getElementById(id);
+  text.select();
+  document.execCommand('copy');
+  show('已复制到剪贴板 ✨');
+}
+
 function payload() {
   return {
     api_base_url: document.getElementById('api_base_url').value.trim(),
@@ -91,11 +255,16 @@ function payload() {
     broadcast_template: document.getElementById('broadcast_template').value,
   };
 }
+
 function show(msg, ok=true) {
   const el = document.getElementById('status');
-  el.className = 'status ' + (ok ? 'ok' : 'err');
+  el.style.display = 'block';
+  el.style.backgroundColor = ok ? 'var(--success)' : 'var(--danger)';
+  el.style.color = '#fff';
   el.textContent = msg;
+  setTimeout(() => { el.style.display = 'none'; }, 3000);
 }
+
 function fill(data) {
   document.getElementById('api_base_url').value = data.api_base_url || '';
   document.getElementById('ha_base_url').value = data.ha_base_url || '';
@@ -105,15 +274,37 @@ function fill(data) {
   document.getElementById('schedule_time').value = data.schedule_time || '07:30';
   document.getElementById('workdays_only').checked = !!data.workdays_only;
   document.getElementById('broadcast_template').value = data.broadcast_template || '';
-  document.getElementById('tokenBadge').textContent = 'Token已配置：' + (data.ha_token_configured ? '是' : '否');
+  
+  const badge = document.getElementById('tokenBadge');
+  badge.textContent = 'Token: ' + (data.ha_token_configured ? '已配置' : '未配置');
+  badge.className = 'badge ' + (data.ha_token_configured ? 'active' : '');
 }
+
+async function checkHaStatus() {
+  try {
+    const res = await fetch('/api/ui/ha-status');
+    const data = await res.json();
+    const isOk = !!(data.status && data.status.connected);
+    const badge = document.getElementById('haConnectionBadge');
+    badge.textContent = isOk ? 'HA: 已连接' : 'HA: 连接异常';
+    badge.className = 'badge ' + (isOk ? 'active' : '');
+    if (!isOk && data.error) console.error(data.error);
+  } catch (e) {
+    show('无法获取 HA 状态', false);
+  }
+}
+
+// ... 保持你原有的 fetch 逻辑函数 (loadConfig, saveConfig, testBroadcast 等) ...
+// 记得在这些函数最后调用 checkHaStatus() 来更新 UI
+
 async function loadConfig() {
   const res = await fetch('/api/ui/config');
   const data = await res.json();
   if (!res.ok) return show(data.error || '读取失败', false);
   fill(data);
-  show('配置已重新读取');
+  show('配置已加载');
 }
+
 async function saveConfig(opts = {}) {
   const current = payload();
   const res = await fetch('/api/ui/config', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(current) });
@@ -123,78 +314,55 @@ async function saveConfig(opts = {}) {
     return null;
   }
   fill({ ...(data.config || {}), ...current, ha_token_configured: (data.config || {}).ha_token_configured });
-  if (!opts.silent) show('配置已保存');
+  if (!opts.silent) show('配置已成功保存');
+  // 顺便触发预览更新
+  previewPackage();
+  previewHelperPackage();
   return data;
 }
+
 async function testBroadcast() {
+  show('正在请求语音测试...');
   const res = await fetch('/api/ui/test-broadcast', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload()) });
   const data = await res.json();
-  if (!res.ok) return show((data.error || '测试失败') + (data.message ? '：' + data.message : ''), false);
-  show('已发送：' + (data.message || 'ok'));
+  if (!res.ok) return show('测试失败', false);
+  show('语音指令发送成功');
 }
+
 async function previewPackage() {
-  const saved = await saveConfig({ silent: true });
-  if (!saved) return;
-  const currentTemplate = document.getElementById('broadcast_template').value;
   const res = await fetch('/api/ui/package-preview');
   const text = await res.text();
   document.getElementById('packagePreview').value = text;
-  document.getElementById('broadcast_template').value = currentTemplate;
-  show('HA 配置已生成，直接复制就行');
 }
+
 async function previewHelperPackage() {
-  const saved = await saveConfig({ silent: true });
-  if (!saved) return;
-  const currentTemplate = document.getElementById('broadcast_template').value;
   const res = await fetch('/api/ui/helper-package-preview');
   const text = await res.text();
   document.getElementById('helperYamlPreview').value = text;
-  document.getElementById('broadcast_template').value = currentTemplate;
-  show('Helper YAML 已生成，缺 helper 就把这段丢进 HA');
 }
+
 async function readHelpers(opts = {}) {
-  const currentTemplate = document.getElementById('broadcast_template').value;
   const res = await fetch('/api/ui/read-helpers');
   const data = await res.json();
-  if (!res.ok) return show(data.error || '读取 Helper 失败', false);
-  document.getElementById('helperStatus').textContent = JSON.stringify(data.result || data, null, 2);
-  let missing = [];
+  if (!res.ok) return show('Helper 读取失败', false);
   if (data.result) {
-    missing = data.result.missing || [];
     if (typeof data.result.schedule_enabled === 'boolean') document.getElementById('schedule_enabled').checked = data.result.schedule_enabled;
     if (data.result.schedule_time) document.getElementById('schedule_time').value = data.result.schedule_time;
-    if (typeof data.result.broadcast_template === 'string' && data.result.broadcast_template.trim()) {
-      document.getElementById('broadcast_template').value = data.result.broadcast_template;
-    } else {
-      document.getElementById('broadcast_template').value = currentTemplate;
-    }
   }
-  if (missing.length) return show('HA 里缺 helper：' + missing.join(', '), false);
-  if (!opts.silent) show('已读取 HA Helper');
+  if (!opts.silent) show('已从 HA 同步状态');
 }
+
 async function syncHelpers() {
-  const currentTemplate = document.getElementById('broadcast_template').value;
+  show('正在同步数据...');
   const res = await fetch('/api/ui/sync-helpers', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload()) });
-  const data = await res.json();
-  if (!res.ok) return show(data.error || '同步失败', false);
-  document.getElementById('broadcast_template').value = currentTemplate;
-  await checkHaStatus();
-  await readHelpers({ silent: true });
-  if (!document.getElementById('broadcast_template').value.trim()) {
-    document.getElementById('broadcast_template').value = currentTemplate;
-  }
-  show('已同步到 HA Helper');
+  if (!res.ok) return show('同步失败', false);
+  show('成功同步至 HA Helper');
+  checkHaStatus();
 }
-async function checkHaStatus() {
-  const res = await fetch('/api/ui/ha-status');
-  const data = await res.json();
-  if (!res.ok) return show(data.error || '检查失败', false);
-  document.getElementById('haStatus').textContent = JSON.stringify(data.status || data, null, 2);
-  show((data.status && data.status.connected) ? 'HA 连接正常' : 'HA 连接异常', !!(data.status && data.status.connected));
-}
+
+// 初始化
 loadConfig();
 checkHaStatus();
-readHelpers({ silent: true });
 </script>
 </body>
 </html>
