@@ -10,7 +10,7 @@
 
 这个服务聚合了以下数据：
 * ☁️ **空气质量数据**（AQI、空气等级、首要污染物）
-* 🌼 **花粉数据**（默认使用 `api.cdfcz.com` 的花粉风险等级接口；保留 `pollencount.app` 作为空气/UV 等兜底数据源）
+* 🌼 **花粉数据**（默认使用 `api.cdfcz.com` 的花粉风险等级接口；空气质量与 UV 改为优先使用和风 `qweather.com`，`pollencount.app` 仅作最终兜底）
 * ☀️ **紫外线指数**
 * 📅 **每日预报数据**
 
@@ -42,11 +42,13 @@ cp .env.example .env
 - 位置名称
 - 经纬度
 - 花粉城市 ID（默认 `101081101`，当前用于呼和浩特）
+- 和风城市 ID（默认 `101080101`，用于空气质量/UV）
+- 和风 API Key（`QWEATHER_KEY`）
 - 主数据源（默认 `api.cdfcz.com`）
 - 刷新间隔
 - 请求超时时间
 
-> 当前默认策略：**花粉主源走 `api.cdfcz.com`，空气质量 / UV 等缺失字段由 `pollencount.app` 兜底**。
+> 当前默认策略：**花粉主源走 `api.cdfcz.com`，空气质量 / UV 优先走和风 `qweather.com`，若和风未配置再回退到 `pollencount.app`**。
 
 ## 🚀 快速开始
 

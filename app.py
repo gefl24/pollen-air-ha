@@ -17,6 +17,8 @@ REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "20"))
 FORECAST_SOURCE = os.getenv("FORECAST_SOURCE", "api.cdfcz.com")
 LOCATION_NAME = os.getenv("LOCATION_NAME", "Hohhot")
 CITY_ID = os.getenv("CITY_ID", "101081101")
+QWEATHER_KEY = os.getenv("QWEATHER_KEY", "")
+QWEATHER_LOCATION = os.getenv("QWEATHER_LOCATION", "101080101")
 
 cache = {
     "location": {
@@ -149,6 +151,78 @@ def fetch_pollencount_forecast(lat, lon):
         },
         "uv_index": uv,
         "daily": forecast_days,
+    }
+
+
+def qweather_category_from_aqi(aqi):
+    if aqi is None:
+        return None, None
+    if aqi <= 50:
+        return "Good", 1
+    if aqi <= 100:
+        return "Moderate", 2
+    if aqi <= 150:
+        return "Unhealthy for Sensitive Groups", 3
+    if aqi <= 200:
+        return "Unhealthy", 4
+    if aqi <= 300:
+        return "Very Unhealthy", 5
+    return "Hazardous", 6
+
+
+def qweather_category_from_uv(index):
+    if index is None:
+        return None, None
+    if index <= 2:
+        return "Low", 1
+    if index <= 5:
+        return "Moderate", 2
+    if index <= 7:
+        return "High", 3
+    if index <= 10:
+        return "Very High", 4
+    return "Extreme", 5
+
+
+def fetch_qweather_air_forecast():
+    if not QWEATHER_KEY:
+        raise ValueError("QWEATHER_KEY is not configured")
+
+    air_now = fetch_json(
+        "https://devapi.qweather.com/v7/air/now",
+        {"location": QWEATHER_LOCATION, "key": QWEATHER_KEY},
+    )
+    now = air_now.get("now") or {}
+    aqi = int(now["aqi"]) if now.get("aqi") not in (None, "") else None
+    air_category, air_category_value = qweather_category_from_aqi(aqi)
+
+    indices = fetch_json(
+        "https://devapi.qweather.com/v7/indices/1d",
+        {"location": QWEATHER_LOCATION, "type": "5", "key": QWEATHER_KEY},
+    )
+    uv_today = (indices.get("daily") or [{}])[0]
+    uv_value = int(uv_today["level"]) if uv_today.get("level", "").isdigit() else None
+    uv_category, uv_category_value = qweather_category_from_uv(uv_value)
+
+    return {
+        "source": "qweather.com",
+        "headline": {},
+        "air": {
+            "aqi": aqi,
+            "category": air_category,
+            "category_value": air_category_value,
+            "primary_pollutant": now.get("primary"),
+            "source": "qweather.com",
+        },
+        "pollen": None,
+        "uv_index": {
+            "value": uv_value,
+            "category": uv_category,
+            "category_value": uv_category_value,
+            "type": None,
+            "text": uv_today.get("text"),
+        },
+        "daily": [],
     }
 
 
@@ -426,10 +500,8 @@ def refresh_once():
     try:
         if FORECAST_SOURCE == "api.cdfcz.com":
             primary_forecast = fetch_cdfcz_pollen(CITY_ID)
-            fallback_forecast = fetch_pollencount_forecast(LAT, LON)
         elif FORECAST_SOURCE == "weather.com.cn":
             primary_forecast = fetch_weather_cn_pollen(CITY_ID)
-            fallback_forecast = fetch_pollencount_forecast(LAT, LON)
         else:
             primary_forecast = fetch_pollencount_forecast(LAT, LON)
             if FORECAST_SOURCE == "pollencount+weather.com.cn":
@@ -437,13 +509,18 @@ def refresh_once():
             elif FORECAST_SOURCE == "pollencount+api.cdfcz.com":
                 fallback_forecast = fetch_cdfcz_pollen(CITY_ID)
     except Exception as e:
-        errors.append(f"primary forecast fetch failed: {e}")
+        errors.append(f"primary pollen fetch failed: {e}")
 
-    if FORECAST_SOURCE in {"weather.com.cn", "api.cdfcz.com"} and fallback_forecast is None:
+    if FORECAST_SOURCE in {"weather.com.cn", "api.cdfcz.com"}:
         try:
-            fallback_forecast = fetch_pollencount_forecast(LAT, LON)
+            fallback_forecast = fetch_qweather_air_forecast()
         except Exception as e:
-            errors.append(f"fallback forecast fetch failed: {e}")
+            errors.append(f"qweather air fetch failed: {e}")
+            if fallback_forecast is None:
+                try:
+                    fallback_forecast = fetch_pollencount_forecast(LAT, LON)
+                except Exception as e2:
+                    errors.append(f"fallback forecast fetch failed: {e2}")
 
     forecast = merge_forecast(primary_forecast, fallback_forecast) if (primary_forecast or fallback_forecast) else None
 

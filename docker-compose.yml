@@ -9,6 +9,8 @@ services:
       LAT: "40.8426"
       LON: "111.7492"
       CITY_ID: "101081101"
+      QWEATHER_LOCATION: "101080101"
+      QWEATHER_KEY: "${QWEATHER_KEY}"
       FORECAST_SOURCE: "api.cdfcz.com"
       REFRESH_SECONDS: "1800"
       REQUEST_TIMEOUT: "20"
