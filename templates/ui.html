@@ -64,8 +64,10 @@
       <div class="actions">
         <button class="primary" onclick="saveConfig()">保存配置</button>
         <button class="ghost" onclick="testBroadcast()">立即发送语音</button>
+        <button class="ghost" onclick="previewPackage()">预览 HA 配置</button>
         <button class="ghost" onclick="loadConfig()">重新读取</button>
       </div>
+      <textarea id="packagePreview" placeholder="这里会显示可直接复制到 HA 的 package 配置"></textarea>
       <div id="status" class="status"></div>
     </section>
   </div>
@@ -117,6 +119,13 @@ async function testBroadcast() {
   const data = await res.json();
   if (!res.ok) return show((data.error || '测试失败') + (data.message ? '：' + data.message : ''), false);
   show('已发送：' + (data.message || 'ok'));
+}
+async function previewPackage() {
+  await saveConfig();
+  const res = await fetch('/api/ui/package-preview');
+  const text = await res.text();
+  document.getElementById('packagePreview').value = text;
+  show('HA 配置已生成，直接复制就行');
 }
 loadConfig();
 </script>
