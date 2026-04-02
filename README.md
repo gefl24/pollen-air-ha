@@ -1,110 +1,119 @@
 # 🍃 Pollen-Air-HA
 
-*Hohhot pollen and air quality service, with a Home Assistant-friendly JSON API.*
+*面向呼和浩特的花粉与空气质量服务，提供适合 Home Assistant 对接的 JSON API。*
 
 [![Docker Image](https://github.com/gefl24/pollen-air-ha/actions/workflows/docker-image.yml/badge.svg)](https://github.com/gefl24/pollen-air-ha/actions/workflows/docker-image.yml)
 [![Release](https://img.shields.io/github/v/release/gefl24/pollen-air-ha)](https://github.com/gefl24/pollen-air-ha/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
-> **💡 Overview**: Designed for lightweight self-hosted deployment and direct Home Assistant integration.
+> **💡 项目概览**：适合轻量自托管部署，也适合直接接入 Home Assistant。
 
-This service aggregates:
-* ☁️ **Air quality data** (AQI, Category, Primary Pollutant)
-* 🌼 **Pollen data** (Grass, Tree, Ragweed, Mold)
-* ☀️ **UV index**
-* 📅 **Daily forecast data**
+这个服务聚合了以下数据：
+* ☁️ **空气质量数据**（AQI、空气等级、首要污染物）
+* 🌼 **花粉数据**（Grass、Tree、Ragweed、Mold）
+* ☀️ **紫外线指数**
+* 📅 **每日预报数据**
 
-🌐 **[中文说明文档 (Chinese README)](docs/README.zh-CN.md)**
+🌐 **[中文说明文档](docs/README.zh-CN.md)**
 
 ---
 
 <details>
-<summary><b>📖 Table of Contents</b></summary>
+<summary><b>📖 目录</b></summary>
 
-- [Configuration](#configuration)
-- [Quick Start](#quick-start)
-- [Docker Image](#docker-image)
-- [API Endpoints](#api-endpoints)
-- [Home Assistant Integration](#home-assistant-integration)
-- [Project Files](#project-files)
-- [Development & Deployment](#development--deployment)
+- [配置说明](#️-配置说明)
+- [快速开始](#-快速开始)
+- [Docker 镜像](#-docker-镜像)
+- [API 接口](#-api-接口)
+- [Home Assistant 对接](#-home-assistant-对接)
+- [项目结构](#-项目结构)
+- [开发与部署](#️-开发与部署)
 </details>
 
-## ⚙️ Configuration
+## ⚙️ 配置说明
 
-Before running the service, copy the example environment file and fill in your required values:
+启动服务前，先复制环境变量示例文件，再按需修改：
 
 ```bash
 cp .env.example .env
+```
 
-## 🚀 Quick Start
+你可以在 `.env` 中配置：
+- 位置名称
+- 经纬度
+- 刷新间隔
+- 请求超时时间
 
-Run the service easily using Docker Compose:
+## 🚀 快速开始
+
+使用 Docker Compose 可以最快跑起来：
 
 ```bash
 docker compose up -d --build
 ```
 
-Test the endpoints:
+启动后可直接测试接口：
 
 ```bash
 curl http://localhost:8080/api/current
 curl http://localhost:8080/api/ha/current
 ```
 
-## 🐳 Docker Image
+## 🐳 Docker 镜像
 
-GitHub Actions automatically builds and publishes the image to GitHub Container Registry (GHCR). You can pull the latest image directly or use the included `docker-compose.yml`.
+GitHub Actions 会自动构建并发布镜像到 GitHub Container Registry（GHCR）。
+
+你可以直接拉最新镜像，也可以使用仓库自带的 `docker-compose.yml`。
 
 ```bash
 docker pull ghcr.io/gefl24/pollen-air-ha:latest
 ```
 
-## 📡 API Endpoints
+## 📡 API 接口
 
-| Endpoint | Description | Key Payload Fields |
+| 接口 | 说明 | 关键字段 |
 | :--- | :--- | :--- |
-| `GET /health` | Health status check | `status` |
-| `GET /api/current` | Full normalized payload | `location`, `air.aqi`, `air.category`, `pollen.*`, `uv_index`, `forecast.daily` |
-| `GET /api/ha/current` | Flatter, HA-friendly payload | `meta.updated_at`, `location.*`, `air.*`, `uv.value`, `pollen.*_value`, `pollen.*_category` |
+| `GET /health` | 健康检查接口 | `status` |
+| `GET /api/current` | 完整归一化数据 | `location`、`air.aqi`、`air.category`、`pollen.*`、`uv_index`、`forecast.daily` |
+| `GET /api/ha/current` | 更扁平、适合 HA 的接口 | `meta.updated_at`、`location.*`、`air.*`、`uv.value`、`pollen.*_value`、`pollen.*_category` |
 
-## 🏡 Home Assistant Integration
+## 🏡 Home Assistant 对接
 
-This API is tailored for Home Assistant. Start here for seamless integration:
+这个 API 本来就是朝着 Home Assistant 接入去设计的，建议你从下面两个文件开始看：
 
-  * 📚 **[Home Assistant Integration Guide](https://www.google.com/search?q=docs/HOME_ASSISTANT.md)** (Full setup instructions)
-  * 📄 **[Example Package Configuration](https://www.google.com/search?q=examples/home-assistant/packages/pollen_air.yaml)** *Recommended next step: A backend risk/advice layer can be added later for even simpler Home Assistant dashboards and automations.*
+* 📚 **[Home Assistant 对接说明](docs/HOME_ASSISTANT.md)**（完整接入步骤）
+* 📄 **[示例 Package 配置](examples/home-assistant/packages/pollen_air.yaml)**（可直接参考抄配置）
 
-## 📂 Project Files
+如果后面还要继续优化，可以再往后端补一层“风险等级 / 开窗建议 / 过敏提醒”这种摘要字段，HA 端会更省心。
+
+## 📂 项目结构
 
 ```text
 pollen-air-ha/
-├── app.py                  # Application entry point
-├── Dockerfile              # Container build instructions
-├── docker-compose.yml      # Local deployment configuration
-├── .env.example            # Example environment variables
-├── docs/                   # Documentation (HA guide, ZH README)
-└── examples/               # Home Assistant package examples
+├── app.py                  # 应用入口
+├── Dockerfile              # 容器构建文件
+├── docker-compose.yml      # 本地部署配置
+├── .env.example            # 环境变量示例
+├── docs/                   # 文档（HA 对接说明、中文说明）
+└── examples/               # Home Assistant 配置示例
 ```
 
-## 🛠️ Development & Deployment
+## 🛠️ 开发与部署
 
 ### GitHub Actions
 
-This repository includes a CI/CD workflow that:
+仓库已经内置 CI/CD 流程，当前会：
 
-  * Builds on pull requests targeting `main`.
-  * Builds and publishes a GHCR image on pushes to `main`.
-  * Publishes tagged builds for versions (e.g., `v0.1.0`).
-  * Supports manual triggering via `workflow_dispatch`.
+* 在发往 `main` 的 Pull Request 上执行构建检查
+* 在推送到 `main` 时构建并发布 GHCR 镜像
+* 在打标签时发布版本镜像（例如 `v0.1.0`）
+* 支持手动触发 `workflow_dispatch`
 
-### Release / Tag Example
+### Release / Tag 示例
 
-To trigger a new version release:
+如果你要手动发一个新版本：
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
-```
-
 ```
