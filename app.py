@@ -14,7 +14,7 @@ LAT = float(os.getenv("LAT", "40.8426"))
 LON = float(os.getenv("LON", "111.7492"))
 REFRESH_SECONDS = int(os.getenv("REFRESH_SECONDS", "1800"))
 REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "20"))
-FORECAST_SOURCE = os.getenv("FORECAST_SOURCE", "weather.com.cn")
+FORECAST_SOURCE = os.getenv("FORECAST_SOURCE", "api.cdfcz.com")
 LOCATION_NAME = os.getenv("LOCATION_NAME", "Hohhot")
 CITY_ID = os.getenv("CITY_ID", "101081101")
 
@@ -200,7 +200,7 @@ def parse_jsonp(text, callback_name="callback"):
     return json.loads(text[len(prefix):-1])
 
 
-def fetch_weather_cn_pollen(city_id):
+def fetch_cdfcz_pollen(city_id):
     city = get_weather_cn_city(city_id)
     today = datetime.now(timezone.utc).date().isoformat()
     params = {
@@ -262,6 +262,69 @@ def fetch_weather_cn_pollen(city_id):
         },
         "uv_index": None,
         "daily": forecast_days,
+    }
+
+
+def fetch_cdfcz_pollen(city_id):
+    city = get_weather_cn_city(city_id)
+    params = {
+        "city": city["en"],
+        "app": "fcwhservice",
+        "channel": "h5",
+        "platform": "h5",
+    }
+    resp = requests.get(
+        "https://api.cdfcz.com/huafen/getCityInfo",
+        params=params,
+        headers={"User-Agent": "Mozilla/5.0"},
+        timeout=REQUEST_TIMEOUT,
+    )
+    resp.raise_for_status()
+    payload = resp.json()
+    result = payload.get("result") or []
+    if not result:
+        raise ValueError("cdfcz pollen response did not include result")
+
+    today_entry = result[0]
+
+    return {
+        "source": "api.cdfcz.com",
+        "headline": {
+            "Text": f"{today_entry.get('city') or city['cn']}花粉风险 {today_entry.get('hf_level') or '暂无'}"
+        },
+        "air": None,
+        "pollen": {
+            "available": True,
+            "mode": "risk_level",
+            "city_id": city["id"],
+            "city_name": today_entry.get("city") or city["cn"],
+            "city_code": today_entry.get("code") or city["en"],
+            "season": "春季",
+            "level_code": None,
+            "level": today_entry.get("hf_level"),
+            "level_message": today_entry.get("content"),
+            "eletype": today_entry.get("eletype"),
+            "level_scale": [],
+            "source": "api.cdfcz.com",
+            "hf_num": today_entry.get("hf_num"),
+            "percent": today_entry.get("percent"),
+            "color": today_entry.get("color"),
+        },
+        "uv_index": None,
+        "daily": [
+            {
+                "date": today_entry.get("date"),
+                "week": None,
+                "level_code": None,
+                "level": today_entry.get("hf_level"),
+                "level_message": today_entry.get("content"),
+                "city_code": today_entry.get("code") or city["en"],
+                "eletype": today_entry.get("eletype"),
+                "hf_num": today_entry.get("hf_num"),
+                "percent": today_entry.get("percent"),
+                "color": today_entry.get("color"),
+            }
+        ],
     }
 
 
@@ -332,6 +395,9 @@ def build_ha_payload():
             "season": pollen.get("season"),
             "city_name": pollen.get("city_name"),
             "city_code": pollen.get("city_code"),
+            "hf_num": pollen.get("hf_num"),
+            "percent": pollen.get("percent"),
+            "color": pollen.get("color"),
         },
         "forecast": {
             "headline": forecast.get("headline", {}).get("Text"),
@@ -358,17 +424,22 @@ def refresh_once():
         errors.append(f"weather.com.cn city meta fetch failed: {e}")
 
     try:
-        if FORECAST_SOURCE == "weather.com.cn":
+        if FORECAST_SOURCE == "api.cdfcz.com":
+            primary_forecast = fetch_cdfcz_pollen(CITY_ID)
+            fallback_forecast = fetch_pollencount_forecast(LAT, LON)
+        elif FORECAST_SOURCE == "weather.com.cn":
             primary_forecast = fetch_weather_cn_pollen(CITY_ID)
             fallback_forecast = fetch_pollencount_forecast(LAT, LON)
         else:
             primary_forecast = fetch_pollencount_forecast(LAT, LON)
             if FORECAST_SOURCE == "pollencount+weather.com.cn":
                 fallback_forecast = fetch_weather_cn_pollen(CITY_ID)
+            elif FORECAST_SOURCE == "pollencount+api.cdfcz.com":
+                fallback_forecast = fetch_cdfcz_pollen(CITY_ID)
     except Exception as e:
         errors.append(f"primary forecast fetch failed: {e}")
 
-    if FORECAST_SOURCE == "weather.com.cn" and fallback_forecast is None:
+    if FORECAST_SOURCE in {"weather.com.cn", "api.cdfcz.com"} and fallback_forecast is None:
         try:
             fallback_forecast = fetch_pollencount_forecast(LAT, LON)
         except Exception as e:
