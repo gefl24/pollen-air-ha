@@ -42,6 +42,12 @@ _worker_lock = threading.Lock()
 _city_mapping = None
 _cdfcz_city_mapping = None
 CONFIG_PATH = Path(os.getenv("UI_CONFIG_PATH", "data/ui_config.json"))
+HA_HELPERS = {
+    "enabled": "input_boolean.pollen_broadcast_enabled",
+    "time": "input_datetime.pollen_broadcast_time",
+    "template": "input_text.pollen_broadcast_template",
+}
+
 DEFAULT_UI_CONFIG = {
     "api_base_url": "",
     "ha_base_url": "",
@@ -191,6 +197,41 @@ def check_ha_status(cfg):
         except Exception as e:
             result["error"] = f"entity check failed: {e}"
     return result
+
+
+def sync_helpers_to_ha(cfg):
+    missing = []
+    states = {}
+    for key, entity_id in HA_HELPERS.items():
+        try:
+            states[key] = get_ha_entity_state(cfg, entity_id)
+        except Exception:
+            missing.append(entity_id)
+    if missing:
+        raise ValueError("missing helper entities: " + ", ".join(missing))
+
+    enabled_service = "/api/services/input_boolean/turn_on" if cfg.get("schedule_enabled") else "/api/services/input_boolean/turn_off"
+    ha_request(cfg, "POST", enabled_service, {"entity_id": HA_HELPERS["enabled"]})
+
+    ha_request(
+        cfg,
+        "POST",
+        "/api/services/input_datetime/set_datetime",
+        {"entity_id": HA_HELPERS["time"], "time": cfg.get("schedule_time") or "07:30"},
+    )
+
+    ha_request(
+        cfg,
+        "POST",
+        "/api/services/input_text/set_value",
+        {"entity_id": HA_HELPERS["template"], "value": cfg.get("broadcast_template") or DEFAULT_UI_CONFIG["broadcast_template"]},
+    )
+    return {
+        "ok": True,
+        "helpers": HA_HELPERS,
+        "schedule_enabled": cfg.get("schedule_enabled"),
+        "schedule_time": cfg.get("schedule_time"),
+    }
 
 
 def sanitize_ui_payload(data, current=None):
@@ -886,6 +927,20 @@ def api_ui_ha_status():
     cfg = load_ui_config()
     try:
         return jsonify({"ok": True, "status": check_ha_status(cfg)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+
+@app.route("/api/ui/sync-helpers", methods=["POST"])
+def api_ui_sync_helpers():
+    incoming = request.get_json(silent=True) or {}
+    current = load_ui_config()
+    cfg = sanitize_ui_payload(incoming, current=current)
+    if incoming:
+        save_ui_config(cfg)
+    try:
+        result = sync_helpers_to_ha(cfg)
+        return jsonify({"ok": True, "result": result})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
 

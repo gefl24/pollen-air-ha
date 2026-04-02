@@ -66,6 +66,7 @@
         <button class="ghost" onclick="testBroadcast()">立即发送语音</button>
         <button class="ghost" onclick="previewPackage()">预览 HA 配置</button>
         <button class="ghost" onclick="checkHaStatus()">检查 HA 连接</button>
+        <button class="ghost" onclick="syncHelpers()">同步到 HA Helper</button>
         <button class="ghost" onclick="loadConfig()">重新读取</button>
       </div>
       <textarea id="packagePreview" placeholder="这里会显示可直接复制到 HA 的 package 配置"></textarea>
@@ -128,6 +129,13 @@ async function previewPackage() {
   const text = await res.text();
   document.getElementById('packagePreview').value = text;
   show('HA 配置已生成，直接复制就行');
+}
+async function syncHelpers() {
+  const res = await fetch('/api/ui/sync-helpers', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload()) });
+  const data = await res.json();
+  if (!res.ok) return show(data.error || '同步失败', false);
+  show('已同步到 HA Helper');
+  await checkHaStatus();
 }
 async function checkHaStatus() {
   const res = await fetch('/api/ui/ha-status');
