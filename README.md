@@ -88,7 +88,7 @@ docker pull ghcr.io/gefl24/pollen-air-ha:latest
 这个 API 本来就是朝着 Home Assistant 接入去设计的，建议你从下面两个文件开始看：
 
 * 📚 **[Home Assistant 对接说明](docs/HOME_ASSISTANT.md)**（完整接入步骤）
-* 📄 **[示例 Package 配置](examples/home-assistant/packages/pollen_air.yaml)**（可直接参考抄配置）
+* 📄 **[示例 Package 配置](examples/home-assistant/packages/pollen_air.yaml)**（可直接参考抄配置，已适配 `configuration.yaml` 的 `packages: !include_dir_named packages` 写法，并包含小爱音箱 `text.xiaomi_lx06_e165_play_text` 播报示例）
 
 如果后面还要继续优化，可以再往后端补一层“风险等级 / 开窗建议 / 过敏提醒”这种摘要字段，HA 端会更省心。
 

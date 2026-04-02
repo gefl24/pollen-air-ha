@@ -95,81 +95,25 @@ You can use the included example file from this repository:
 examples/home-assistant/packages/pollen_air.yaml
 ```
 
+This repository now includes a package example that is already adapted for `configuration.yaml` package mode and XiaoAi text-entity playback (`text.xiaomi_lx06_e165_play_text`).
+
 ---
 
-## 4. Minimal package example
+## 4. Package example (configuration.yaml compatible)
 
 Replace `YOUR_SERVER_IP` with your actual server IP or domain.
 
-```yaml
-sensor:
-  - platform: rest
-    name: pollen_air_raw
-    resource: http://YOUR_SERVER_IP:8080/api/ha/current
-    method: GET
-    scan_interval: 1800
-    timeout: 15
-    value_template: "{{ value_json.meta.updated_at | default('unknown') }}"
-    json_attributes:
-      - meta
-      - location
-      - air
-      - uv
-      - pollen
-      - forecast
+A ready-to-copy package file is included here:
 
-template:
-  - sensor:
-      - name: pollen_air_aqi
-        unique_id: pollen_air_aqi
-        unit_of_measurement: "AQI"
-        state: >
-          {{ state_attr('sensor.pollen_air_raw', 'air').aqi
-             if state_attr('sensor.pollen_air_raw', 'air') is not none else 'unknown' }}
-        icon: mdi:air-filter
-
-      - name: pollen_air_category
-        unique_id: pollen_air_category
-        state: >
-          {{ state_attr('sensor.pollen_air_raw', 'air').category
-             if state_attr('sensor.pollen_air_raw', 'air') is not none else 'unknown' }}
-        icon: mdi:weather-hazy
-
-      - name: pollen_uv_value
-        unique_id: pollen_uv_value
-        state: >
-          {{ state_attr('sensor.pollen_air_raw', 'uv').value
-             if state_attr('sensor.pollen_air_raw', 'uv') is not none else 'unknown' }}
-        icon: mdi:weather-sunny-alert
-
-      - name: pollen_grass_value
-        unique_id: pollen_grass_value
-        state: >
-          {{ state_attr('sensor.pollen_air_raw', 'pollen').grass_value
-             if state_attr('sensor.pollen_air_raw', 'pollen') is not none else 'unknown' }}
-        icon: mdi:grass
-
-      - name: pollen_tree_value
-        unique_id: pollen_tree_value
-        state: >
-          {{ state_attr('sensor.pollen_air_raw', 'pollen').tree_value
-             if state_attr('sensor.pollen_air_raw', 'pollen') is not none else 'unknown' }}
-        icon: mdi:tree-outline
-
-      - name: pollen_ragweed_value
-        unique_id: pollen_ragweed_value
-        state: >
-          {{ state_attr('sensor.pollen_air_raw', 'pollen').ragweed_value
-             if state_attr('sensor.pollen_air_raw', 'pollen') is not none else 'unknown' }}
-        icon: mdi:sprout
-
-      - name: pollen_mold_value
-        unique_id: pollen_mold_value
-        state: >
-          {{ state_attr('sensor.pollen_air_raw', 'pollen').mold_value
-             if state_attr('sensor.pollen_air_raw', 'pollen') is not none else 'unknown' }}
-        icon: mdi:blur
+```text
+examples/home-assistant/packages/pollen_air.yaml
 ```
+
+It contains:
+- REST sensor for `/api/ha/current`
+- template sensors for pollen / AQI / risk helpers
+- XiaoAi broadcast script using `text.xiaomi_lx06_e165_play_text`
+- daily automation example
 
 ---
 

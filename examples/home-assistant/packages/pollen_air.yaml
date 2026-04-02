@@ -1,106 +1,117 @@
 # Home Assistant package example for pollen-air-ha
 # Save as: packages/pollen_air.yaml
 # Replace YOUR_SERVER_IP with your actual server IP or domain.
+# XiaoAi text entity example included: text.xiaomi_lx06_e165_play_text
 
-sensor:
-  - platform: rest
-    name: pollen_air_raw
-    resource: http://YOUR_SERVER_IP:8080/api/ha/current
-    method: GET
+rest:
+  - resource: http://YOUR_SERVER_IP:8080/api/ha/current
     scan_interval: 1800
     timeout: 15
-    value_template: "{{ value_json.meta.updated_at | default('unknown') }}"
-    json_attributes:
-      - meta
-      - location
-      - air
-      - uv
-      - pollen
-      - forecast
+    sensor:
+      - name: pollen_air_ha_raw
+        value_template: "{{ value_json.meta.updated_at | default('unknown') }}"
+        json_attributes:
+          - location
+          - air
+          - uv
+          - pollen
+          - forecast
 
 template:
   - sensor:
-      - name: pollen_air_aqi
-        unique_id: pollen_air_aqi
-        unit_of_measurement: "AQI"
+      - name: "呼和浩特花粉等级"
+        unique_id: hohhot_pollen_level
         state: >
-          {{ state_attr('sensor.pollen_air_raw', 'air').aqi
-             if state_attr('sensor.pollen_air_raw', 'air') is not none else 'unknown' }}
-        icon: mdi:air-filter
+          {{ state_attr('sensor.pollen_air_ha_raw', 'pollen').level
+             if state_attr('sensor.pollen_air_ha_raw', 'pollen') else 'unknown' }}
 
-      - name: pollen_air_category
-        unique_id: pollen_air_category
+      - name: "呼和浩特花粉提示"
+        unique_id: hohhot_pollen_message
         state: >
-          {{ state_attr('sensor.pollen_air_raw', 'air').category
-             if state_attr('sensor.pollen_air_raw', 'air') is not none else 'unknown' }}
-        icon: mdi:weather-hazy
+          {{ state_attr('sensor.pollen_air_ha_raw', 'pollen').level_message
+             if state_attr('sensor.pollen_air_ha_raw', 'pollen') else '暂无数据' }}
 
-      - name: pollen_air_primary_pollutant
-        unique_id: pollen_air_primary_pollutant
+      - name: "呼和浩特花粉数值"
+        unique_id: hohhot_pollen_score
         state: >
-          {{ state_attr('sensor.pollen_air_raw', 'air').primary_pollutant
-             if state_attr('sensor.pollen_air_raw', 'air') is not none else 'unknown' }}
-        icon: mdi:molecule
+          {{ state_attr('sensor.pollen_air_ha_raw', 'pollen').hf_num
+             if state_attr('sensor.pollen_air_ha_raw', 'pollen') else '0' }}
 
-      - name: pollen_uv_value
-        unique_id: pollen_uv_value
+      - name: "呼和浩特AQI"
+        unique_id: hohhot_air_aqi
         state: >
-          {{ state_attr('sensor.pollen_air_raw', 'uv').value
-             if state_attr('sensor.pollen_air_raw', 'uv') is not none else 'unknown' }}
-        icon: mdi:weather-sunny-alert
+          {{ state_attr('sensor.pollen_air_ha_raw', 'air').aqi
+             if state_attr('sensor.pollen_air_ha_raw', 'air') else '0' }}
 
-      - name: pollen_grass_value
-        unique_id: pollen_grass_value
+      - name: "呼和浩特空气质量等级"
+        unique_id: hohhot_air_category
         state: >
-          {{ state_attr('sensor.pollen_air_raw', 'pollen').grass_value
-             if state_attr('sensor.pollen_air_raw', 'pollen') is not none else 'unknown' }}
-        icon: mdi:grass
+          {{ state_attr('sensor.pollen_air_ha_raw', 'air').category
+             if state_attr('sensor.pollen_air_ha_raw', 'air') else 'unknown' }}
 
-      - name: pollen_grass_category
-        unique_id: pollen_grass_category
+      - name: "呼和浩特花粉是否风险"
+        unique_id: hohhot_pollen_is_risky
         state: >
-          {{ state_attr('sensor.pollen_air_raw', 'pollen').grass_category
-             if state_attr('sensor.pollen_air_raw', 'pollen') is not none else 'unknown' }}
-        icon: mdi:grass
+          {{ state_attr('sensor.pollen_air_ha_raw', 'pollen').is_risky
+             if state_attr('sensor.pollen_air_ha_raw', 'pollen') else false }}
 
-      - name: pollen_tree_value
-        unique_id: pollen_tree_value
+      - name: "呼和浩特建议开窗"
+        unique_id: hohhot_open_window_recommended
         state: >
-          {{ state_attr('sensor.pollen_air_raw', 'pollen').tree_value
-             if state_attr('sensor.pollen_air_raw', 'pollen') is not none else 'unknown' }}
-        icon: mdi:tree-outline
+          {{ state_attr('sensor.pollen_air_ha_raw', 'pollen').open_window_recommended
+             if state_attr('sensor.pollen_air_ha_raw', 'pollen') is not none else false }}
 
-      - name: pollen_tree_category
-        unique_id: pollen_tree_category
+      - name: "呼和浩特建议戴口罩"
+        unique_id: hohhot_mask_recommended
         state: >
-          {{ state_attr('sensor.pollen_air_raw', 'pollen').tree_category
-             if state_attr('sensor.pollen_air_raw', 'pollen') is not none else 'unknown' }}
-        icon: mdi:tree-outline
+          {{ state_attr('sensor.pollen_air_ha_raw', 'pollen').mask_recommended
+             if state_attr('sensor.pollen_air_ha_raw', 'pollen') is not none else false }}
 
-      - name: pollen_ragweed_value
-        unique_id: pollen_ragweed_value
-        state: >
-          {{ state_attr('sensor.pollen_air_raw', 'pollen').ragweed_value
-             if state_attr('sensor.pollen_air_raw', 'pollen') is not none else 'unknown' }}
-        icon: mdi:sprout
+script:
+  xiaoai_broadcast_pollen_air:
+    alias: 小爱播报花粉和空气质量
+    sequence:
+      - variables:
+          pollen: "{{ state_attr('sensor.pollen_air_ha_raw', 'pollen') or {} }}"
+          air: "{{ state_attr('sensor.pollen_air_ha_raw', 'air') or {} }}"
+          air_cn: >-
+            {% set m = {
+              'Good':'优',
+              'Moderate':'良',
+              'Unhealthy for Sensitive Groups':'轻度污染',
+              'Unhealthy':'中度污染',
+              'Very Unhealthy':'重度污染',
+              'Hazardous':'严重污染'
+            } %}
+            {{ m.get(air.category, air.category if air.category else '未知') }}
+          msg: >-
+            早上好，呼和浩特今天花粉风险{{ pollen.level if pollen.level else '未知' }}，
+            花粉数值{{ pollen.hf_num if pollen.hf_num is not none else '暂无' }}。
+            {{ pollen.level_message if pollen.level_message else '暂无花粉提示。' }}
+            空气质量{{ air_cn }}，AQI {{ air.aqi if air.aqi is not none else '暂无' }}。
+            {% if pollen.open_window_recommended == true %}
+            今天可以适当开窗通风。
+            {% else %}
+            今天不建议长时间开窗。
+            {% endif %}
+            {% if pollen.mask_recommended == true %}
+            易敏人群出门建议戴口罩。
+            {% endif %}
+      - service: text.set_value
+        target:
+          entity_id: text.xiaomi_lx06_e165_play_text
+        data:
+          value: "{{ msg }}"
 
-      - name: pollen_ragweed_category
-        unique_id: pollen_ragweed_category
-        state: >
-          {{ state_attr('sensor.pollen_air_raw', 'pollen').ragweed_category
-             if state_attr('sensor.pollen_air_raw', 'pollen') is not none else 'unknown' }}
-        icon: mdi:sprout
-
-      - name: pollen_mold_value
-        unique_id: pollen_mold_value
-        state: >
-          {{ state_attr('sensor.pollen_air_raw', 'pollen').mold_value
-             if state_attr('sensor.pollen_air_raw', 'pollen') is not none else 'unknown' }}
-        icon: mdi:blur
-
-      - name: pollen_mold_category
-        unique_id: pollen_mold_category
-        state: >
-          {{ state_attr('sensor.pollen_air_raw', 'pollen').mold_category
-             if state_attr('sensor.pollen_air_raw', 'pollen') is not none else 'unknown' }}
-        icon: mdi:blur
+automation:
+  - alias: 每日小爱播报花粉和空气质量
+    id: daily_xiaoai_pollen_air_report
+    trigger:
+      - platform: time
+        at: "07:30:00"
+    action:
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.pollen_air_ha_raw
+      - delay: "00:00:03"
+      - service: script.xiaoai_broadcast_pollen_air
