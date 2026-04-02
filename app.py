@@ -12,6 +12,7 @@ LAT = float(os.getenv("LAT", "40.8426"))
 LON = float(os.getenv("LON", "111.7492"))
 REFRESH_SECONDS = int(os.getenv("REFRESH_SECONDS", "1800"))
 REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "20"))
+FORECAST_SOURCE = os.getenv("FORECAST_SOURCE", "pollencount.app")
 
 cache = {
     "location": {
@@ -21,6 +22,7 @@ cache = {
     },
     "air": None,
     "pollen": None,
+    "forecast": None,
     "updated_at": None,
     "errors": [],
 }
@@ -34,105 +36,143 @@ def now_iso():
 
 
 def fetch_json(url, params):
-    resp = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+    resp = requests.get(
+        url,
+        params=params,
+        timeout=REQUEST_TIMEOUT,
+        headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
+    )
     resp.raise_for_status()
     return resp.json()
 
 
-def fetch_air_data(lat, lon):
-    url = "https://air-quality-api.open-meteo.com/v1/air-quality"
-    params = {
-        "latitude": lat,
-        "longitude": lon,
-        "current": ",".join([
-            "european_aqi",
-            "us_aqi",
-            "pm2_5",
-            "pm10",
-            "ozone",
-            "nitrogen_dioxide",
-            "sulphur_dioxide",
-            "carbon_monoxide",
-        ]),
-        "timezone": "auto",
-    }
-
-    data = fetch_json(url, params)
-    current = data.get("current", {})
-
-    return {
-        "aqi_eu": current.get("european_aqi"),
-        "aqi_us": current.get("us_aqi"),
-        "pm25": current.get("pm2_5"),
-        "pm10": current.get("pm10"),
-        "o3": current.get("ozone"),
-        "no2": current.get("nitrogen_dioxide"),
-        "so2": current.get("sulphur_dioxide"),
-        "co": current.get("carbon_monoxide"),
-        "source": "open-meteo",
-    }
-
-
-def fetch_pollen_data(lat, lon):
-    url = "https://air-quality-api.open-meteo.com/v1/air-quality"
-    params = {
-        "latitude": lat,
-        "longitude": lon,
-        "current": ",".join([
-            "alder_pollen",
-            "birch_pollen",
-            "grass_pollen",
-            "mugwort_pollen",
-            "olive_pollen",
-            "ragweed_pollen",
-        ]),
-        "timezone": "auto",
-    }
-
-    data = fetch_json(url, params)
-    current = data.get("current", {})
-
-    pollen_fields = {
-        "alder": current.get("alder_pollen"),
-        "birch": current.get("birch_pollen"),
-        "grass": current.get("grass_pollen"),
-        "mugwort": current.get("mugwort_pollen"),
-        "olive": current.get("olive_pollen"),
-        "ragweed": current.get("ragweed_pollen"),
-    }
-
-    if all(v is None for v in pollen_fields.values()):
-        return {
-            "available": False,
-            "reason": "provider_returned_no_pollen_data_for_this_region",
-            "source": "open-meteo",
-            "raw": pollen_fields,
+def normalize_air_and_pollen(entries):
+    result = {}
+    for item in entries:
+        name = item.get("Name")
+        if not name:
+            continue
+        result[name] = {
+            "value": item.get("Value"),
+            "category": item.get("Category"),
+            "category_value": item.get("CategoryValue"),
+            "type": item.get("Type"),
         }
+    return result
+
+
+def fetch_location_name(lat, lon):
+    data = fetch_json(
+        "https://pollencount.app/api/geocodeReverse",
+        {"lat": lat, "lng": lon},
+    )
+
+    city = data.get("city") or ""
+    state = data.get("state") or ""
+    country = data.get("country") or ""
+
+    display_name = ", ".join([x for x in [city, state, country] if x]).strip()
+    return {
+        "city": city,
+        "state": state,
+        "country": country,
+        "display_name": display_name or cache["location"].get("name") or "Unknown",
+        "source": "pollencount.app",
+    }
+
+
+def fetch_forecast_data(lat, lon):
+    data = fetch_json(
+        "https://pollencount.app/api/getForecast",
+        {"lat": lat, "lng": lon},
+    )
+    daily = data.get("DailyForecasts", [])
+    if not daily:
+        raise ValueError("forecast response did not include DailyForecasts")
+
+    today = daily[0]
+    air_and_pollen = normalize_air_and_pollen(today.get("AirAndPollen", []))
+
+    def get_entry(name):
+        return air_and_pollen.get(
+            name,
+            {"value": None, "category": None, "category_value": None, "type": None},
+        )
+
+    air = get_entry("AirQuality")
+    grass = get_entry("Grass")
+    tree = get_entry("Tree")
+    ragweed = get_entry("Ragweed")
+    mold = get_entry("Mold")
+    uv = get_entry("UVIndex")
+
+    forecast_days = []
+    for item in daily[:5]:
+        normalized = normalize_air_and_pollen(item.get("AirAndPollen", []))
+        forecast_days.append(
+            {
+                "date": item.get("Date"),
+                "air_quality": normalized.get("AirQuality"),
+                "grass": normalized.get("Grass"),
+                "tree": normalized.get("Tree"),
+                "ragweed": normalized.get("Ragweed"),
+                "mold": normalized.get("Mold"),
+                "uv_index": normalized.get("UVIndex"),
+            }
+        )
 
     return {
-        "available": True,
-        **pollen_fields,
-        "source": "open-meteo",
+        "source": FORECAST_SOURCE,
+        "headline": data.get("Headline", {}),
+        "air": {
+            "aqi": air.get("value"),
+            "category": air.get("category"),
+            "category_value": air.get("category_value"),
+            "primary_pollutant": air.get("type"),
+            "source": FORECAST_SOURCE,
+        },
+        "pollen": {
+            "available": True,
+            "grass": grass,
+            "tree": tree,
+            "ragweed": ragweed,
+            "mold": mold,
+            "source": FORECAST_SOURCE,
+        },
+        "uv_index": uv,
+        "daily": forecast_days,
     }
 
 
 def refresh_once():
     errors = []
-    air = None
-    pollen = None
+    location_info = None
+    forecast = None
 
     try:
-        air = fetch_air_data(LAT, LON)
+        location_info = fetch_location_name(LAT, LON)
     except Exception as e:
-        errors.append(f"air fetch failed: {e}")
+        errors.append(f"location fetch failed: {e}")
 
     try:
-        pollen = fetch_pollen_data(LAT, LON)
+        forecast = fetch_forecast_data(LAT, LON)
     except Exception as e:
-        errors.append(f"pollen fetch failed: {e}")
+        errors.append(f"forecast fetch failed: {e}")
 
-    cache["air"] = air
-    cache["pollen"] = pollen
+    if location_info:
+        cache["location"] = {
+            "name": location_info["display_name"],
+            "lat": LAT,
+            "lon": LON,
+            "city": location_info["city"],
+            "state": location_info["state"],
+            "country": location_info["country"],
+            "source": location_info["source"],
+        }
+
+    cache["forecast"] = forecast
+    cache["air"] = forecast.get("air") if forecast else None
+    cache["pollen"] = forecast.get("pollen") if forecast else None
     cache["updated_at"] = now_iso()
     cache["errors"] = errors
 
@@ -163,20 +203,29 @@ ensure_worker_started()
 
 @app.route("/")
 def index():
-    return jsonify({
-        "service": "pollen-air-ha",
-        "endpoints": ["/health", "/api/current"],
-    })
+    return jsonify(
+        {
+            "service": "pollen-air-ha",
+            "source": FORECAST_SOURCE,
+            "endpoints": ["/health", "/api/current"],
+        }
+    )
 
 
 @app.route("/health")
 def health():
-    ok = cache["air"] is not None or cache["pollen"] is not None
-    return jsonify({
-        "status": "ok" if ok else "degraded",
-        "updated_at": cache["updated_at"],
-        "errors": cache["errors"],
-    }), (200 if ok else 503)
+    ok = cache["forecast"] is not None
+    return (
+        jsonify(
+            {
+                "status": "ok" if ok else "degraded",
+                "updated_at": cache["updated_at"],
+                "errors": cache["errors"],
+                "source": FORECAST_SOURCE,
+            }
+        ),
+        (200 if ok else 503),
+    )
 
 
 @app.route("/api/current")

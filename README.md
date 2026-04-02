@@ -1,13 +1,19 @@
 # pollen-air-ha
 
-一个最小可运行的 Docker 服务，用于获取指定地点的空气污染数据，并尝试获取花粉数据，统一暴露给 Home Assistant。
+一个最小可运行的 Docker 服务，用于获取指定地点的空气污染与花粉预报，并统一暴露给 Home Assistant。
 
 ## 当前目标
 
 - 地点：呼和浩特
-- 空气质量：Open-Meteo
-- 花粉：优先尝试 Open-Meteo pollen 字段
+- 数据源：`pollencount.app`
 - 输出：HTTP JSON API
+- 支持字段：
+  - AirQuality
+  - Grass
+  - Tree
+  - Ragweed
+  - Mold
+  - UVIndex
 
 ## 目录结构
 
@@ -39,34 +45,21 @@ curl http://localhost:8080/api/current
 返回服务状态、更新时间、错误信息。
 
 ### `GET /api/current`
-返回当前地点、空气质量、花粉数据。
+返回当前地点、空气质量、花粉、5天预报摘要。
 
-## 说明
+## 数据源说明
 
-### 空气质量
-当前使用 Open-Meteo air-quality API，通常可稳定返回：
-- AQI
-- PM2.5
-- PM10
-- 臭氧
-- 二氧化氮
-- 二氧化硫
-- 一氧化碳
+当前通过以下接口获取数据：
 
-### 花粉
-当前优先调用 Open-Meteo pollen 相关字段：
-- alder_pollen
-- birch_pollen
-- grass_pollen
-- mugwort_pollen
-- olive_pollen
-- ragweed_pollen
+- `https://pollencount.app/api/geocodeReverse?lat=...&lng=...`
+- `https://pollencount.app/api/getForecast?lat=...&lng=...`
 
-若该地区无返回，则明确返回：
-- `available: false`
-- `reason: provider_returned_no_pollen_data_for_this_region`
+实测呼和浩特可返回：
+- 地点反查
+- 空气质量
+- 花粉字段（Grass / Tree / Ragweed / Mold）
 
-不会伪造数据。
+注意：某些日期花粉数值可能为 0，这表示当前预报值低，不是接口不可用。
 
 ## Home Assistant 示例
 
@@ -75,27 +68,27 @@ rest:
   - resource: http://你的Docker主机IP:8080/api/current
     scan_interval: 1800
     sensor:
-      - name: hohhot_air_aqi_us
-        value_template: "{{ value_json.air.aqi_us }}"
-      - name: hohhot_pm25
-        value_template: "{{ value_json.air.pm25 }}"
-      - name: hohhot_pm10
-        value_template: "{{ value_json.air.pm10 }}"
+      - name: hohhot_air_aqi
+        value_template: "{{ value_json.air.aqi }}"
+      - name: hohhot_air_category
+        value_template: "{{ value_json.air.category }}"
       - name: hohhot_pollen_grass
-        value_template: >
-          {% if value_json.pollen and value_json.pollen.available %}
-            {{ value_json.pollen.grass }}
-          {% else %}
-            unavailable
-          {% endif %}
+        value_template: "{{ value_json.pollen.grass.value }}"
+      - name: hohhot_pollen_tree
+        value_template: "{{ value_json.pollen.tree.value }}"
+      - name: hohhot_pollen_ragweed
+        value_template: "{{ value_json.pollen.ragweed.value }}"
+      - name: hohhot_mold
+        value_template: "{{ value_json.pollen.mold.value }}"
+      - name: hohhot_uv_index
+        value_template: "{{ value_json.forecast.uv_index.value }}"
 ```
 
 ## 后续建议
 
 如果要做成长期稳定项目，建议继续补：
 
-1. 多数据源容错
-2. 花粉插件化 provider
-3. Prometheus metrics
-4. MQTT 输出给 Home Assistant
-5. 历史数据落盘
+1. 增加结果缓存落盘
+2. 增加 Prometheus metrics
+3. 增加 MQTT 输出给 Home Assistant
+4. 增加数据源降级策略（避免第三方源挂掉）
