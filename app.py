@@ -441,6 +441,24 @@ def merge_forecast(primary, fallback):
     return merged
 
 
+def derive_pollen_risk_helpers(pollen):
+    level = (pollen.get("level") or "").strip()
+    hf_num = pollen.get("hf_num")
+    risky_levels = {"中", "高", "很高"}
+    very_risky_levels = {"高", "很高"}
+    is_risky = level in risky_levels
+    is_very_risky = level in very_risky_levels
+    open_window_recommended = None if not level else not is_risky
+    mask_recommended = None if not level else is_risky
+    return {
+        "is_risky": is_risky,
+        "is_very_risky": is_very_risky,
+        "open_window_recommended": open_window_recommended,
+        "mask_recommended": mask_recommended,
+        "risk_score": hf_num,
+    }
+
+
 def build_ha_payload():
     location = cache.get("location") or {}
     air = cache.get("air") or {}
@@ -499,6 +517,11 @@ def build_ha_payload():
             "hf_num": pollen.get("hf_num"),
             "percent": pollen.get("percent"),
             "color": pollen.get("color"),
+            "is_risky": risk_helpers.get("is_risky"),
+            "is_very_risky": risk_helpers.get("is_very_risky"),
+            "risk_score": risk_helpers.get("risk_score"),
+            "open_window_recommended": risk_helpers.get("open_window_recommended"),
+            "mask_recommended": risk_helpers.get("mask_recommended"),
         },
         "forecast": {
             "headline": forecast.get("headline", {}).get("Text"),

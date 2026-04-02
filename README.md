@@ -81,7 +81,7 @@ docker pull ghcr.io/gefl24/pollen-air-ha:latest
 | :--- | :--- | :--- |
 | `GET /health` | 健康检查接口 | `status` |
 | `GET /api/current` | 完整归一化数据 | `location`、`air.aqi`、`air.category`、`pollen.*`、`uv_index`、`forecast.daily` |
-| `GET /api/ha/current` | 更扁平、适合 HA 的接口 | `meta.updated_at`、`location.*`、`air.*`、`uv.value`、`pollen.*_value`、`pollen.*_category` |
+| `GET /api/ha/current` | 更扁平、适合 HA 的接口 | `meta.updated_at`、`location.*`、`air.*`、`uv.value`、`pollen.level`、`pollen.hf_num`、`pollen.is_risky`、`pollen.open_window_recommended` |
 
 ## 🏡 Home Assistant 对接
 
@@ -91,6 +91,14 @@ docker pull ghcr.io/gefl24/pollen-air-ha:latest
 * 📄 **[示例 Package 配置](examples/home-assistant/packages/pollen_air.yaml)**（可直接参考抄配置）
 
 如果后面还要继续优化，可以再往后端补一层“风险等级 / 开窗建议 / 过敏提醒”这种摘要字段，HA 端会更省心。
+
+
+HA 自动化现在可以直接用这些字段：
+- `pollen.is_risky`：是否属于中/高/很高风险
+- `pollen.is_very_risky`：是否属于高/很高风险
+- `pollen.risk_score`：当前花粉数值（当前主源下对应 `hf_num`）
+- `pollen.open_window_recommended`：是否建议开窗
+- `pollen.mask_recommended`：是否建议戴口罩外出
 
 ## 📂 项目结构
 
