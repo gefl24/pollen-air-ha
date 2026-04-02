@@ -96,6 +96,10 @@ Returns a flatter Home Assistant-friendly payload including:
 If you want direct GitHub-viewable setup instructions, start here:
 - [Home Assistant Integration Guide](docs/HOME_ASSISTANT.md)
 
+## 中文说明
+
+- 中文说明文档: [docs/README.zh-CN.md](docs/README.zh-CN.md)
+
 ## Configuration
 
 Copy the example environment file:
