@@ -367,8 +367,9 @@ def fetch_cdfcz_pollen(city_id):
 
 def fetch_cdfcz_pollen(city_id):
     city = get_cdfcz_city(city_id)
+    city_code = city.get("code") or city.get("en")
     params = {
-        "city": city["en"],
+        "city": city_code,
         "app": "fcwhservice",
         "channel": "h5",
         "platform": "h5",
@@ -397,8 +398,8 @@ def fetch_cdfcz_pollen(city_id):
             "available": True,
             "mode": "risk_level",
             "city_id": city["id"],
-            "city_name": today_entry.get("city") or city["cn"],
-            "city_code": today_entry.get("code") or city["en"],
+            "city_name": today_entry.get("city") or city.get("city") or city.get("cn"),
+            "city_code": today_entry.get("code") or city_code,
             "season": "春季",
             "level_code": None,
             "level": today_entry.get("hf_level"),
@@ -418,7 +419,7 @@ def fetch_cdfcz_pollen(city_id):
                 "level_code": None,
                 "level": today_entry.get("hf_level"),
                 "level_message": today_entry.get("content"),
-                "city_code": today_entry.get("code") or city["en"],
+                "city_code": today_entry.get("code") or city_code,
                 "eletype": today_entry.get("eletype"),
                 "hf_num": today_entry.get("hf_num"),
                 "percent": today_entry.get("percent"),
