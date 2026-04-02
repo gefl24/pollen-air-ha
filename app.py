@@ -250,6 +250,14 @@ def sanitize_ui_payload(data, current=None):
     return cleaned
 
 
+def sync_schedule_to_config_yaml(cfg):
+    if not cfg.get("schedule_enabled"):
+        return None
+    days = "1-5" if cfg.get("workdays_only") else "*"
+    hh, mm = (cfg.get("schedule_time") or "07:30").split(":")
+    return f"# Suggested cron expression for external scheduler: {int(mm)} {int(hh)} * * {days}"
+
+
 def fetch_current_payload_for_ui(cfg):
     base_url = (cfg.get("api_base_url") or "").rstrip("/")
     if base_url:
