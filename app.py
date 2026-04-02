@@ -293,6 +293,30 @@ def fetch_current_payload_for_ui(cfg):
     return build_ha_payload()
 
 
+def build_helper_package_yaml(cfg):
+    schedule_time = cfg.get("schedule_time") or "07:30"
+    broadcast_template = cfg.get("broadcast_template") or DEFAULT_UI_CONFIG["broadcast_template"]
+    safe_template = broadcast_template.replace('"', "'")
+    return f'''input_boolean:
+  pollen_broadcast_enabled:
+    name: Pollen Broadcast Enabled
+
+input_datetime:
+  pollen_broadcast_time:
+    name: Pollen Broadcast Time
+    has_date: false
+    has_time: true
+
+input_text:
+  pollen_broadcast_template:
+    name: Pollen Broadcast Template
+    max: 255
+    initial: "{safe_template}"
+
+# 初始化建议时间：{schedule_time}
+'''
+
+
 def build_ha_package_yaml(cfg):
     template_path = Path("templates/ha_package_template.yaml")
     body = template_path.read_text()
@@ -954,6 +978,12 @@ def api_ui_test_broadcast():
 def api_ui_package_preview():
     cfg = load_ui_config()
     return Response(build_ha_package_yaml(cfg), mimetype="text/plain; charset=utf-8")
+
+
+@app.route("/api/ui/helper-package-preview", methods=["GET"])
+def api_ui_helper_package_preview():
+    cfg = load_ui_config()
+    return Response(build_helper_package_yaml(cfg), mimetype="text/plain; charset=utf-8")
 
 
 @app.route("/api/ui/ha-status", methods=["GET"])
