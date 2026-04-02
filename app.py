@@ -164,6 +164,24 @@ def fetch_current_payload_for_ui(cfg):
     return build_ha_payload()
 
 
+def build_ha_package_yaml(cfg):
+    template_path = Path("templates/ha_package_template.yaml")
+    body = template_path.read_text()
+    api_base_url = (cfg.get("api_base_url") or "http://YOUR_SERVER_IP:8080").rstrip("/")
+    entity_id = cfg.get("xiaoai_entity_id") or "text.xiaomi_lx06_e165_play_text"
+    schedule_time = cfg.get("schedule_time") or "07:30"
+    broadcast_template = cfg.get("broadcast_template") or DEFAULT_UI_CONFIG["broadcast_template"]
+    weekdays_block = ""
+    if cfg.get("workdays_only"):
+        weekdays_block = "    condition:\n      - condition: time\n        weekday:\n          - mon\n          - tue\n          - wed\n          - thu\n          - fri"
+    body = body.replace("__API_BASE_URL__", api_base_url)
+    body = body.replace("__ENTITY_ID__", entity_id)
+    body = body.replace("__SCHEDULE_TIME__", schedule_time)
+    body = body.replace("__BROADCAST_TEMPLATE__", broadcast_template)
+    body = body.replace("__WEEKDAYS_BLOCK__", weekdays_block)
+    return body
+
+
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
@@ -801,6 +819,12 @@ def api_ui_test_broadcast():
         return jsonify({"ok": True, "message": message, "result": result})
     except Exception as e:
         return jsonify({"ok": False, "error": "broadcast test failed", "message": str(e)}), 400
+
+
+@app.route("/api/ui/package-preview", methods=["GET"])
+def api_ui_package_preview():
+    cfg = load_ui_config()
+    return Response(build_ha_package_yaml(cfg), mimetype="text/plain; charset=utf-8")
 
 
 @app.route("/health")

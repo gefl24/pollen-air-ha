@@ -1,0 +1,55 @@
+rest:
+  - resource: __API_BASE_URL__/api/ha/current
+    scan_interval: 1800
+    timeout: 15
+    sensor:
+      - name: pollen_air_ha_raw
+        value_template: "{{ value_json.meta.updated_at | default('unknown') }}"
+        json_attributes:
+          - location
+          - air
+          - uv
+          - pollen
+          - forecast
+
+template:
+  - sensor:
+      - name: "呼和浩特花粉等级"
+        state: >
+          {{ state_attr('sensor.pollen_air_ha_raw', 'pollen').level if state_attr('sensor.pollen_air_ha_raw', 'pollen') else 'unknown' }}
+
+      - name: "呼和浩特AQI"
+        state: >
+          {{ state_attr('sensor.pollen_air_ha_raw', 'air').aqi if state_attr('sensor.pollen_air_ha_raw', 'air') else '0' }}
+
+script:
+  xiaoai_broadcast_pollen_air:
+    alias: 小爱播报花粉和空气质量
+    sequence:
+      - variables:
+          pollen: "{{ state_attr('sensor.pollen_air_ha_raw', 'pollen') or {} }}"
+          air: "{{ state_attr('sensor.pollen_air_ha_raw', 'air') or {} }}"
+          air_cn: >-
+            {% set m = {'Good':'优','Moderate':'良','Unhealthy for Sensitive Groups':'轻度污染','Unhealthy':'中度污染','Very Unhealthy':'重度污染','Hazardous':'严重污染'} %}
+            {{ m.get(air.category, air.category if air.category else '未知') }}
+          msg: >-
+            __BROADCAST_TEMPLATE__
+      - service: text.set_value
+        target:
+          entity_id: __ENTITY_ID__
+        data:
+          value: "{{ msg }}"
+
+automation:
+  - alias: 每日小爱播报花粉和空气质量
+    id: daily_xiaoai_pollen_air_report
+    trigger:
+      - platform: time
+        at: "__SCHEDULE_TIME__:00"
+__WEEKDAYS_BLOCK__
+    action:
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.pollen_air_ha_raw
+      - delay: "00:00:03"
+      - service: script.xiaoai_broadcast_pollen_air
