@@ -152,29 +152,38 @@ async function previewHelperPackage() {
   document.getElementById('broadcast_template').value = currentTemplate;
   show('Helper YAML 已生成，缺 helper 就把这段丢进 HA');
 }
-async function readHelpers() {
+async function readHelpers(opts = {}) {
+  const currentTemplate = document.getElementById('broadcast_template').value;
   const res = await fetch('/api/ui/read-helpers');
   const data = await res.json();
   if (!res.ok) return show(data.error || '读取 Helper 失败', false);
   document.getElementById('helperStatus').textContent = JSON.stringify(data.result || data, null, 2);
+  let missing = [];
   if (data.result) {
-    const missing = data.result.missing || [];
-    if (missing.length) {
-      show('HA 里缺 helper：' + missing.join(', '), false);
-    }
+    missing = data.result.missing || [];
     if (typeof data.result.schedule_enabled === 'boolean') document.getElementById('schedule_enabled').checked = data.result.schedule_enabled;
     if (data.result.schedule_time) document.getElementById('schedule_time').value = data.result.schedule_time;
-    if (data.result.broadcast_template) document.getElementById('broadcast_template').value = data.result.broadcast_template;
+    if (typeof data.result.broadcast_template === 'string' && data.result.broadcast_template.trim()) {
+      document.getElementById('broadcast_template').value = data.result.broadcast_template;
+    } else {
+      document.getElementById('broadcast_template').value = currentTemplate;
+    }
   }
-  show('已读取 HA Helper');
+  if (missing.length) return show('HA 里缺 helper：' + missing.join(', '), false);
+  if (!opts.silent) show('已读取 HA Helper');
 }
 async function syncHelpers() {
+  const currentTemplate = document.getElementById('broadcast_template').value;
   const res = await fetch('/api/ui/sync-helpers', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload()) });
   const data = await res.json();
   if (!res.ok) return show(data.error || '同步失败', false);
-  show('已同步到 HA Helper');
+  document.getElementById('broadcast_template').value = currentTemplate;
   await checkHaStatus();
-readHelpers();
+  await readHelpers({ silent: true });
+  if (!document.getElementById('broadcast_template').value.trim()) {
+    document.getElementById('broadcast_template').value = currentTemplate;
+  }
+  show('已同步到 HA Helper');
 }
 async function checkHaStatus() {
   const res = await fetch('/api/ui/ha-status');
@@ -185,7 +194,7 @@ async function checkHaStatus() {
 }
 loadConfig();
 checkHaStatus();
-readHelpers();
+readHelpers({ silent: true });
 </script>
 </body>
 </html>
