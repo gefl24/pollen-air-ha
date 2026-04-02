@@ -65,12 +65,14 @@
         <button class="primary" onclick="saveConfig()">保存配置</button>
         <button class="ghost" onclick="testBroadcast()">立即发送语音</button>
         <button class="ghost" onclick="previewPackage()">预览 HA 配置</button>
+        <button class="ghost" onclick="previewHelperPackage()">生成 Helper YAML</button>
         <button class="ghost" onclick="checkHaStatus()">检查 HA 连接</button>
         <button class="ghost" onclick="syncHelpers()">同步到 HA Helper</button>
         <button class="ghost" onclick="readHelpers()">读取 HA Helper</button>
         <button class="ghost" onclick="loadConfig()">重新读取</button>
       </div>
       <textarea id="packagePreview" placeholder="这里会显示可直接复制到 HA 的 package 配置"></textarea>
+      <textarea id="helperYamlPreview" placeholder="这里会显示可直接复制到 HA 的 helper YAML" style="margin-top:12px;"></textarea>
       <div id="status" class="status"></div>
       <pre id="haStatus" style="margin-top:12px;background:#0d1430;padding:12px;border-radius:12px;border:1px solid #283252;color:#cdd6f7;white-space:pre-wrap;word-break:break-word;"></pre>
       <pre id="helperStatus" style="margin-top:12px;background:#0d1430;padding:12px;border-radius:12px;border:1px solid #283252;color:#cdd6f7;white-space:pre-wrap;word-break:break-word;"></pre>
@@ -132,12 +134,23 @@ async function previewPackage() {
   document.getElementById('packagePreview').value = text;
   show('HA 配置已生成，直接复制就行');
 }
+async function previewHelperPackage() {
+  await saveConfig();
+  const res = await fetch('/api/ui/helper-package-preview');
+  const text = await res.text();
+  document.getElementById('helperYamlPreview').value = text;
+  show('Helper YAML 已生成，缺 helper 就把这段丢进 HA');
+}
 async function readHelpers() {
   const res = await fetch('/api/ui/read-helpers');
   const data = await res.json();
   if (!res.ok) return show(data.error || '读取 Helper 失败', false);
   document.getElementById('helperStatus').textContent = JSON.stringify(data.result || data, null, 2);
   if (data.result) {
+    const missing = data.result.missing || [];
+    if (missing.length) {
+      show('HA 里缺 helper：' + missing.join(', '), false);
+    }
     if (typeof data.result.schedule_enabled === 'boolean') document.getElementById('schedule_enabled').checked = data.result.schedule_enabled;
     if (data.result.schedule_time) document.getElementById('schedule_time').value = data.result.schedule_time;
     if (data.result.broadcast_template) document.getElementById('broadcast_template').value = data.result.broadcast_template;
