@@ -1,7 +1,7 @@
 services:
   pollen-air-ha:
-    image: ghcr.io/gefl24/pollen-air-ha:latest
     build: .
+    image: pollen-air-ha:local
     container_name: pollen-air-ha
     restart: unless-stopped
     environment:
