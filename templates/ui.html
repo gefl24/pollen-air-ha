@@ -168,12 +168,8 @@
             <input id="wechat_push_title" placeholder="花粉空气播报" />
           </div>
           <div class="form-group">
-            <label>企微中转网址（优先）</label>
-            <input id="wechat_push_proxy_url" placeholder="https://your-proxy.example.com/wecom/send" />
-          </div>
-          <div class="form-group">
-            <label>微信推送 Webhook（中转可留空）</label>
-            <input id="wechat_push_webhook" placeholder="支持 Server酱 / PushPlus / 企业微信机器人" />
+            <label>HA 企业微信通知服务名</label>
+            <input id="wechat_notify_service" placeholder="notify.wecom_bot" />
           </div>
         </section>
 
@@ -277,8 +273,7 @@ function payload() {
     xiaoai_entity_id: document.getElementById('xiaoai_entity_id').value.trim(),
     wechat_push_enabled: document.getElementById('wechat_push_enabled').checked,
     wechat_push_title: document.getElementById('wechat_push_title').value.trim(),
-    wechat_push_proxy_url: document.getElementById('wechat_push_proxy_url').value.trim(),
-    wechat_push_webhook: document.getElementById('wechat_push_webhook').value.trim(),
+    wechat_notify_service: document.getElementById('wechat_notify_service').value.trim(),
     schedule_enabled: document.getElementById('schedule_enabled').checked,
     schedule_time: document.getElementById('schedule_time').value,
     schedule_time_2: document.getElementById('schedule_time_2').value,
@@ -304,8 +299,7 @@ function fill(data) {
   document.getElementById('xiaoai_entity_id').value = data.xiaoai_entity_id || '';
   document.getElementById('wechat_push_enabled').checked = !!data.wechat_push_enabled;
   document.getElementById('wechat_push_title').value = data.wechat_push_title || '花粉空气播报';
-  document.getElementById('wechat_push_proxy_url').value = data.wechat_push_proxy_url || '';
-  document.getElementById('wechat_push_webhook').value = data.wechat_push_webhook || '';
+  document.getElementById('wechat_notify_service').value = data.wechat_notify_service || '';
   document.getElementById('schedule_enabled').checked = !!data.schedule_enabled;
   document.getElementById('schedule_time').value = data.schedule_time || '07:30';
   document.getElementById('schedule_time_2').value = data.schedule_time_2 || '00:00';

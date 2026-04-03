@@ -60,6 +60,7 @@ DEFAULT_UI_CONFIG = {
     "workdays_only": False,
     "broadcast_template": "早上好，{city}今天花粉风险{pollen_level}，花粉数值{pollen_score}。{pollen_message} 空气质量{air_category_cn}，AQI {aqi}。{window_advice}{mask_advice}",
     "wechat_push_enabled": False,
+    "wechat_notify_service": "",
     "wechat_push_webhook": "",
     "wechat_push_proxy_url": "",
     "wechat_push_title": "花粉空气播报",
@@ -154,36 +155,16 @@ def call_home_assistant_service(cfg, message):
 def call_wechat_push(cfg, message):
     if not cfg.get("wechat_push_enabled"):
         return {"enabled": False, "skipped": True}
-    webhook = (cfg.get("wechat_push_webhook") or "").strip()
-    proxy_url = (cfg.get("wechat_push_proxy_url") or "").strip()
+    notify_service = (cfg.get("wechat_notify_service") or "").strip()
     title = (cfg.get("wechat_push_title") or "花粉空气播报").strip()
-
-    if proxy_url:
-        resp = requests.post(
-            proxy_url,
-            json={"title": title, "content": message, "webhook": webhook},
-            timeout=REQUEST_TIMEOUT,
-        )
-    else:
-        if not webhook:
-            raise ValueError("wechat_push_webhook is required when wechat_push_enabled is true")
-        if "sctapi.ftqq.com" in webhook or "sc.ftqq.com" in webhook:
-            resp = requests.post(webhook, data={"title": title, "desp": message}, timeout=REQUEST_TIMEOUT)
-        elif "pushplus.plus" in webhook:
-            resp = requests.post(webhook, json={"title": title, "content": message, "template": "txt"}, timeout=REQUEST_TIMEOUT)
-        elif "qyapi.weixin.qq.com" in webhook:
-            resp = requests.post(
-                webhook,
-                json={"msgtype": "text", "text": {"content": title + "\n" + message}},
-                timeout=REQUEST_TIMEOUT,
-            )
-        else:
-            resp = requests.post(webhook, json={"title": title, "content": message}, timeout=REQUEST_TIMEOUT)
-    resp.raise_for_status()
-    try:
-        return resp.json()
-    except Exception:
-        return {"status": resp.status_code, "text": resp.text}
+    if not notify_service:
+        raise ValueError("wechat_notify_service is required when wechat_push_enabled is true")
+    return ha_request(
+        cfg,
+        "POST",
+        f"/api/services/{notify_service.replace('.', '/')}",
+        {"title": title, "message": message},
+    )
 
 
 def ha_request(cfg, method, path, json_body=None):
@@ -317,6 +298,7 @@ def sanitize_ui_payload(data, current=None):
     cleaned["workdays_only"] = bool(data.get("workdays_only"))
     cleaned["broadcast_template"] = str((data.get("broadcast_template") or current.get("broadcast_template") or DEFAULT_UI_CONFIG["broadcast_template"])).strip()
     cleaned["wechat_push_enabled"] = bool(data.get("wechat_push_enabled"))
+    cleaned["wechat_notify_service"] = str((data.get("wechat_notify_service") or current.get("wechat_notify_service") or "")).strip()
     cleaned["wechat_push_webhook"] = str((data.get("wechat_push_webhook") or current.get("wechat_push_webhook") or "")).strip()
     cleaned["wechat_push_proxy_url"] = str((data.get("wechat_push_proxy_url") or current.get("wechat_push_proxy_url") or "")).strip()
     cleaned["wechat_push_title"] = str((data.get("wechat_push_title") or current.get("wechat_push_title") or "花粉空气播报")).strip()
