@@ -61,6 +61,7 @@ DEFAULT_UI_CONFIG = {
     "broadcast_template": "早上好，{city}今天花粉风险{pollen_level}，花粉数值{pollen_score}。{pollen_message} 空气质量{air_category_cn}，AQI {aqi}。{window_advice}{mask_advice}",
     "wechat_push_enabled": False,
     "wechat_push_webhook": "",
+    "wechat_push_proxy_url": "",
     "wechat_push_title": "花粉空气播报",
 }
 
@@ -309,6 +310,7 @@ def sanitize_ui_payload(data, current=None):
     cleaned["broadcast_template"] = str((data.get("broadcast_template") or current.get("broadcast_template") or DEFAULT_UI_CONFIG["broadcast_template"])).strip()
     cleaned["wechat_push_enabled"] = bool(data.get("wechat_push_enabled"))
     cleaned["wechat_push_webhook"] = str((data.get("wechat_push_webhook") or current.get("wechat_push_webhook") or "")).strip()
+    cleaned["wechat_push_proxy_url"] = str((data.get("wechat_push_proxy_url") or current.get("wechat_push_proxy_url") or "")).strip()
     cleaned["wechat_push_title"] = str((data.get("wechat_push_title") or current.get("wechat_push_title") or "花粉空气播报")).strip()
     return cleaned
 
