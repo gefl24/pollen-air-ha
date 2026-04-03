@@ -53,4 +53,4 @@ __WEEKDAYS_BLOCK__
           entity_id: sensor.pollen_air_ha_raw
       - delay: "00:00:03"
       - service: script.xiaoai_broadcast_pollen_air
-__WECHAT_NOTIFY_BLOCK__
+__WECHAT_NOTIFY_BLOCK____EVENT_TRIGGER_BLOCK__

@@ -114,6 +114,7 @@ It contains:
 - template sensors for pollen / AQI / risk helpers
 - XiaoAi broadcast script using `text.xiaomi_lx06_e165_play_text`
 - daily automation example
+- optional entity-change trigger automation (for example: monitor `sensor.xiaomi_lx06_e165_conversation` and delay-broadcast pollen after keywords like `天气`)
 
 ---
 

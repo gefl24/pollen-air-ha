@@ -200,17 +200,56 @@
             </label>
           </div>
         </section>
+
+        <section class="card">
+          <h2><span>🎯</span> 实体触发播报</h2>
+          <div class="form-group">
+            <label class="checkbox-group">
+              <input id="event_trigger_enabled" type="checkbox" />
+              <span>启用实体属性变化触发播报</span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label>监听实体 ID</label>
+            <input id="event_entity_id" placeholder="sensor.xiaomi_lx06_e165_conversation" />
+          </div>
+          <div class="form-group">
+            <label>监听属性名（留空时回退 state）</label>
+            <input id="event_attribute_name" placeholder="content" />
+          </div>
+          <div class="form-group">
+            <label>命中关键词（逗号分隔）</label>
+            <input id="event_keywords" placeholder="天气,天气怎么样,今天天气怎么样" />
+          </div>
+          <div class="form-group">
+            <label>延迟播报分钟数</label>
+            <input id="event_delay_minutes" type="number" min="0" max="120" value="2" />
+          </div>
+        </section>
       </div>
 
       <div class="space-y-6">
         <section class="card">
-          <h2><span>📝</span> 播报内容模版</h2>
+          <h2><span>📝</span> 每日播报内容模版</h2>
           <textarea id="broadcast_template" style="min-height: 160px; margin-bottom: 12px;" placeholder="输入播报话术..."></textarea>
           <div style="display: flex; flex-wrap: wrap; gap: 6px;">
             <span class="variable-tag" onclick="insertVar('{city}')">{城市}</span>
             <span class="variable-tag" onclick="insertVar('{pollen_level}')">{花粉等级}</span>
             <span class="variable-tag" onclick="insertVar('{aqi}')">{AQI}</span>
             <span class="variable-tag" onclick="insertVar('{window_advice}')">{开窗建议}</span>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2><span>🗣️</span> 触发后播报模版</h2>
+          <textarea id="event_broadcast_template" style="min-height: 130px; margin-bottom: 12px;" placeholder="输入触发型播报话术..."></textarea>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+            <span class="variable-tag" onclick="insertEventVar('{city}')">{城市}</span>
+            <span class="variable-tag" onclick="insertEventVar('{pollen_level}')">{花粉等级}</span>
+            <span class="variable-tag" onclick="insertEventVar('{pollen_score}')">{花粉数值}</span>
+            <span class="variable-tag" onclick="insertEventVar('{pollen_message}')">{花粉提示}</span>
+            <span class="variable-tag" onclick="insertEventVar('{window_advice}')">{开窗建议}</span>
+            <span class="variable-tag" onclick="insertEventVar('{mask_advice}')">{口罩建议}</span>
           </div>
         </section>
 
@@ -257,6 +296,14 @@ function insertVar(val) {
   area.focus();
 }
 
+function insertEventVar(val) {
+  const area = document.getElementById('event_broadcast_template');
+  const start = area.selectionStart;
+  const end = area.selectionEnd;
+  area.value = area.value.substring(0, start) + val + area.value.substring(end);
+  area.focus();
+}
+
 // 辅助：复制到剪贴板
 function copyToClipboard(id) {
   const text = document.getElementById(id);
@@ -280,6 +327,12 @@ function payload() {
     schedule_time_3: document.getElementById('schedule_time_3').value,
     workdays_only: document.getElementById('workdays_only').checked,
     broadcast_template: document.getElementById('broadcast_template').value,
+    event_trigger_enabled: document.getElementById('event_trigger_enabled').checked,
+    event_entity_id: document.getElementById('event_entity_id').value.trim(),
+    event_attribute_name: document.getElementById('event_attribute_name').value.trim(),
+    event_keywords: document.getElementById('event_keywords').value.trim(),
+    event_delay_minutes: document.getElementById('event_delay_minutes').value,
+    event_broadcast_template: document.getElementById('event_broadcast_template').value,
   };
 }
 
@@ -306,7 +359,13 @@ function fill(data) {
   document.getElementById('schedule_time_3').value = data.schedule_time_3 || '00:00';
   document.getElementById('workdays_only').checked = !!data.workdays_only;
   document.getElementById('broadcast_template').value = data.broadcast_template || '';
-  
+  document.getElementById('event_trigger_enabled').checked = !!data.event_trigger_enabled;
+  document.getElementById('event_entity_id').value = data.event_entity_id || 'sensor.xiaomi_lx06_e165_conversation';
+  document.getElementById('event_attribute_name').value = data.event_attribute_name || 'content';
+  document.getElementById('event_keywords').value = data.event_keywords || '天气,天气怎么样,今天天气怎么样';
+  document.getElementById('event_delay_minutes').value = data.event_delay_minutes ?? 2;
+  document.getElementById('event_broadcast_template').value = data.event_broadcast_template || '';
+
   const badge = document.getElementById('tokenBadge');
   badge.textContent = 'Token: ' + (data.ha_token_configured ? '已配置' : '未配置');
   badge.className = 'badge ' + (data.ha_token_configured ? 'active' : '');

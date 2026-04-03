@@ -59,6 +59,12 @@ DEFAULT_UI_CONFIG = {
     "schedule_time_3": "00:00",
     "workdays_only": False,
     "broadcast_template": "早上好，{city}今天花粉风险{pollen_level}，花粉数值{pollen_score}。{pollen_message} 空气质量{air_category_cn}，AQI {aqi}。{window_advice}{mask_advice}",
+    "event_trigger_enabled": False,
+    "event_entity_id": "sensor.xiaomi_lx06_e165_conversation",
+    "event_attribute_name": "content",
+    "event_keywords": "天气,天气怎么样,今天天气怎么样",
+    "event_delay_minutes": 2,
+    "event_broadcast_template": "当前实时花粉情况是，{city}花粉风险{pollen_level}，花粉数值{pollen_score}。{pollen_message} {window_advice}{mask_advice}",
     "wechat_push_enabled": False,
     "wechat_notify_service": "",
     "wechat_push_webhook": "",
@@ -297,6 +303,19 @@ def sanitize_ui_payload(data, current=None):
     cleaned["schedule_time_3"] = str((data.get("schedule_time_3") or current.get("schedule_time_3") or "00:00")).strip()[:5]
     cleaned["workdays_only"] = bool(data.get("workdays_only"))
     cleaned["broadcast_template"] = str((data.get("broadcast_template") or current.get("broadcast_template") or DEFAULT_UI_CONFIG["broadcast_template"])).strip()
+    cleaned["event_trigger_enabled"] = bool(data.get("event_trigger_enabled"))
+    cleaned["event_entity_id"] = str((data.get("event_entity_id") or current.get("event_entity_id") or DEFAULT_UI_CONFIG["event_entity_id"])).strip()
+    cleaned["event_attribute_name"] = str((data.get("event_attribute_name") or current.get("event_attribute_name") or DEFAULT_UI_CONFIG["event_attribute_name"])).strip()
+    cleaned["event_keywords"] = str((data.get("event_keywords") or current.get("event_keywords") or DEFAULT_UI_CONFIG["event_keywords"])).strip()
+    delay_minutes = data.get("event_delay_minutes")
+    if delay_minutes in (None, ""):
+        delay_minutes = current.get("event_delay_minutes") or DEFAULT_UI_CONFIG["event_delay_minutes"]
+    try:
+        delay_minutes = int(delay_minutes)
+    except Exception:
+        delay_minutes = DEFAULT_UI_CONFIG["event_delay_minutes"]
+    cleaned["event_delay_minutes"] = max(0, min(delay_minutes, 120))
+    cleaned["event_broadcast_template"] = str((data.get("event_broadcast_template") or current.get("event_broadcast_template") or DEFAULT_UI_CONFIG["event_broadcast_template"])).strip()
     cleaned["wechat_push_enabled"] = bool(data.get("wechat_push_enabled"))
     cleaned["wechat_notify_service"] = str((data.get("wechat_notify_service") or current.get("wechat_notify_service") or "")).strip()
     cleaned["wechat_push_webhook"] = str((data.get("wechat_push_webhook") or current.get("wechat_push_webhook") or "")).strip()
@@ -353,6 +372,7 @@ def build_ha_package_yaml(cfg):
     entity_id = cfg.get("xiaoai_entity_id") or "text.xiaomi_lx06_e165_play_text"
     schedule_time = cfg.get("schedule_time") or "07:30"
     broadcast_template = cfg.get("broadcast_template") or DEFAULT_UI_CONFIG["broadcast_template"]
+
     weekdays_block = ""
     if cfg.get("workdays_only"):
         weekdays_block = (
@@ -365,15 +385,79 @@ def build_ha_package_yaml(cfg):
             "          - thu\n"
             "          - fri"
         )
+
     wechat_notify_block = ""
     if cfg.get("wechat_push_enabled") and (cfg.get("wechat_push_webhook") or "").strip():
         wechat_notify_block = "      - service: rest_command.pollen_air_wechat_notify\n"
+
+    event_trigger_block = ""
+    if cfg.get("event_trigger_enabled"):
+        event_entity_id = cfg.get("event_entity_id") or DEFAULT_UI_CONFIG["event_entity_id"]
+        event_attribute_name = cfg.get("event_attribute_name") or DEFAULT_UI_CONFIG["event_attribute_name"]
+        event_template = cfg.get("event_broadcast_template") or DEFAULT_UI_CONFIG["event_broadcast_template"]
+        raw_delay = cfg.get("event_delay_minutes")
+        if raw_delay in (None, ""):
+            raw_delay = DEFAULT_UI_CONFIG["event_delay_minutes"]
+        try:
+            event_delay = int(raw_delay)
+        except Exception:
+            event_delay = DEFAULT_UI_CONFIG["event_delay_minutes"]
+        event_delay = max(0, min(event_delay, 120))
+        delay_h = event_delay // 60
+        delay_m = event_delay % 60
+        event_delay_hms = f"{delay_h:02d}:{delay_m:02d}:00"
+        keywords = [k.strip() for k in str(cfg.get("event_keywords") or DEFAULT_UI_CONFIG["event_keywords"]).split(",") if k.strip()]
+        event_keywords_list = "[" + ", ".join(json.dumps(k, ensure_ascii=False) for k in keywords) + "]"
+        event_trigger_block = """
+
+  - alias: 小爱问天气后延迟播报实时花粉
+    id: xiaoai_weather_then_pollen_now
+    trigger:
+      - platform: state
+        entity_id: __EVENT_ENTITY_ID__
+    action:
+      - variables:
+          spoken_text: >-
+            {{ state_attr('__EVENT_ENTITY_ID__', '__EVENT_ATTRIBUTE_NAME__') or trigger.to_state.state or '' }}
+          spoken_text_lc: "{{ spoken_text | lower }}"
+          trigger_keywords: __EVENT_KEYWORDS__
+      - condition: template
+        value_template: >-
+          {{ trigger_keywords | select('in', spoken_text_lc) | list | count > 0 }}
+      - delay: "__EVENT_DELAY_HMS__"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.pollen_air_ha_raw
+      - delay: "00:00:03"
+      - variables:
+          pollen: "{{ state_attr('sensor.pollen_air_ha_raw', 'pollen') or dict() }}"
+          air: "{{ state_attr('sensor.pollen_air_ha_raw', 'air') or dict() }}"
+          air_cn: >-
+            {% set m = {'Good':'优','Moderate':'良','Unhealthy for Sensitive Groups':'轻度污染','Unhealthy':'中度污染','Very Unhealthy':'重度污染','Hazardous':'严重污染'} %}
+            {{ m.get(air.category, air.category if air.category else '未知') }}
+          msg: >-
+            __EVENT_BROADCAST_TEMPLATE__
+      - service: text.set_value
+        target:
+          entity_id: __ENTITY_ID__
+        data:
+          value: "{{ msg }}"
+    mode: restart
+"""
+        event_trigger_block = event_trigger_block.replace("__EVENT_ENTITY_ID__", event_entity_id)
+        event_trigger_block = event_trigger_block.replace("__EVENT_ATTRIBUTE_NAME__", event_attribute_name)
+        event_trigger_block = event_trigger_block.replace("__EVENT_KEYWORDS__", event_keywords_list)
+        event_trigger_block = event_trigger_block.replace("__EVENT_DELAY_HMS__", event_delay_hms)
+        event_trigger_block = event_trigger_block.replace("__EVENT_BROADCAST_TEMPLATE__", event_template)
+        event_trigger_block = event_trigger_block.replace("__ENTITY_ID__", entity_id)
+
     body = body.replace("__API_BASE_URL__", api_base_url)
     body = body.replace("__ENTITY_ID__", entity_id)
     body = body.replace("__SCHEDULE_TIME__", schedule_time)
     body = body.replace("__BROADCAST_TEMPLATE__", broadcast_template)
     body = body.replace("__WEEKDAYS_BLOCK__", weekdays_block)
     body = body.replace("__WECHAT_NOTIFY_BLOCK__", wechat_notify_block)
+    body = body.replace("__EVENT_TRIGGER_BLOCK__", event_trigger_block)
     return body
 
 def now_iso():
