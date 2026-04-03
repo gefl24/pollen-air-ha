@@ -363,14 +363,26 @@ def build_ha_package_yaml(cfg):
     broadcast_template = cfg.get("broadcast_template") or DEFAULT_UI_CONFIG["broadcast_template"]
     weekdays_block = ""
     if cfg.get("workdays_only"):
-        weekdays_block = "    condition:\n      - condition: time\n        weekday:\n          - mon\n          - tue\n          - wed\n          - thu\n          - fri"
+        weekdays_block = (
+            "    condition:\n"
+            "      - condition: time\n"
+            "        weekday:\n"
+            "          - mon\n"
+            "          - tue\n"
+            "          - wed\n"
+            "          - thu\n"
+            "          - fri"
+        )
+    wechat_notify_block = ""
+    if cfg.get("wechat_push_enabled") and (cfg.get("wechat_push_webhook") or "").strip():
+        wechat_notify_block = "      - service: rest_command.pollen_air_wechat_notify\n"
     body = body.replace("__API_BASE_URL__", api_base_url)
     body = body.replace("__ENTITY_ID__", entity_id)
     body = body.replace("__SCHEDULE_TIME__", schedule_time)
     body = body.replace("__BROADCAST_TEMPLATE__", broadcast_template)
     body = body.replace("__WEEKDAYS_BLOCK__", weekdays_block)
+    body = body.replace("__WECHAT_NOTIFY_BLOCK__", wechat_notify_block)
     return body
-
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
