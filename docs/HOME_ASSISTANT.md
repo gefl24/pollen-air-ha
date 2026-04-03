@@ -113,7 +113,7 @@ It contains:
 - REST sensor for `/api/ha/current`
 - template sensors for pollen / AQI / risk helpers
 - XiaoAi broadcast script using `text.xiaomi_lx06_e165_play_text`
-- daily automation example
+- daily automation example (supports up to 3 daily schedule times; `00:00` means disabled)
 - optional entity-change trigger automation (for example: monitor `sensor.xiaomi_lx06_e165_conversation` and delay-broadcast pollen after keywords like `天气`)
 
 ---

@@ -135,6 +135,31 @@ def build_broadcast_message(payload, cfg):
     return re.sub(r"\s+", " ", message).strip()
 
 
+HA_TEMPLATE_TOKEN_MAP = {
+    "city": "{{ state_attr('sensor.pollen_air_ha_raw', 'location').city if state_attr('sensor.pollen_air_ha_raw', 'location') and state_attr('sensor.pollen_air_ha_raw', 'location').city else (state_attr('sensor.pollen_air_ha_raw', 'location').name if state_attr('sensor.pollen_air_ha_raw', 'location') and state_attr('sensor.pollen_air_ha_raw', 'location').name else '本地') }}",
+    "pollen_level": "{{ pollen.level if pollen.level else '未知' }}",
+    "pollen_score": "{{ pollen.hf_num if pollen.hf_num is not none else '暂无' }}",
+    "pollen_message": "{{ pollen.level_message if pollen.level_message else '暂无花粉提示。' }}",
+    "aqi": "{{ air.aqi if air.aqi is not none else '暂无' }}",
+    "air_category_cn": "{{ air_cn }}",
+    "window_advice": "{% if pollen.open_window_recommended == true %}今天可以适当开窗通风。{% else %}今天不建议长时间开窗。{% endif %}",
+    "mask_advice": "{% if pollen.mask_recommended == true %}易敏人群出门建议戴口罩。{% endif %}",
+}
+
+
+def convert_format_template_to_ha(template):
+    raw = str(template or "").strip()
+    if not raw:
+        return "暂无播报内容。"
+
+    def repl(match):
+        key = match.group(1)
+        return HA_TEMPLATE_TOKEN_MAP.get(key, match.group(0))
+
+    converted = re.sub(r"\{([a-zA-Z0-9_]+)\}", repl, raw)
+    return converted
+
+
 def call_home_assistant_service(cfg, message):
     base_url = (cfg.get("ha_base_url") or "").rstrip("/")
     token = cfg.get("ha_token") or ""
@@ -370,8 +395,24 @@ def build_ha_package_yaml(cfg):
     body = template_path.read_text()
     api_base_url = (cfg.get("api_base_url") or "http://YOUR_SERVER_IP:8080").rstrip("/")
     entity_id = cfg.get("xiaoai_entity_id") or "text.xiaomi_lx06_e165_play_text"
-    schedule_time = cfg.get("schedule_time") or "07:30"
-    broadcast_template = cfg.get("broadcast_template") or DEFAULT_UI_CONFIG["broadcast_template"]
+
+    raw_schedule_times = [
+        cfg.get("schedule_time") or DEFAULT_UI_CONFIG["schedule_time"],
+        cfg.get("schedule_time_2") or DEFAULT_UI_CONFIG["schedule_time_2"],
+        cfg.get("schedule_time_3") or DEFAULT_UI_CONFIG["schedule_time_3"],
+    ]
+    schedule_times = []
+    seen_times = set()
+    for value in raw_schedule_times:
+        time_value = str(value or "").strip()[:5]
+        if not time_value or time_value == "00:00" or time_value in seen_times:
+            continue
+        seen_times.add(time_value)
+        schedule_times.append(time_value)
+    if not schedule_times:
+        schedule_times = [DEFAULT_UI_CONFIG["schedule_time"]]
+
+    broadcast_template = convert_format_template_to_ha(cfg.get("broadcast_template") or DEFAULT_UI_CONFIG["broadcast_template"])
 
     weekdays_block = ""
     if cfg.get("workdays_only"):
@@ -390,11 +431,15 @@ def build_ha_package_yaml(cfg):
     if cfg.get("wechat_push_enabled") and (cfg.get("wechat_push_webhook") or "").strip():
         wechat_notify_block = "      - service: rest_command.pollen_air_wechat_notify\n"
 
+    schedule_triggers_block = "\n".join(
+        f'      - platform: time\n        at: "{t}:00"' for t in schedule_times
+    )
+
     event_trigger_block = ""
     if cfg.get("event_trigger_enabled"):
         event_entity_id = cfg.get("event_entity_id") or DEFAULT_UI_CONFIG["event_entity_id"]
         event_attribute_name = cfg.get("event_attribute_name") or DEFAULT_UI_CONFIG["event_attribute_name"]
-        event_template = cfg.get("event_broadcast_template") or DEFAULT_UI_CONFIG["event_broadcast_template"]
+        event_template = convert_format_template_to_ha(cfg.get("event_broadcast_template") or DEFAULT_UI_CONFIG["event_broadcast_template"])
         raw_delay = cfg.get("event_delay_minutes")
         if raw_delay in (None, ""):
             raw_delay = DEFAULT_UI_CONFIG["event_delay_minutes"]
@@ -437,11 +482,13 @@ def build_ha_package_yaml(cfg):
             {{ m.get(air.category, air.category if air.category else '未知') }}
           msg: >-
             __EVENT_BROADCAST_TEMPLATE__
+          msg_with_nonce: >-
+            {{ msg ~ ' ' ~ now().strftime('%H:%M:%S') }}
       - service: text.set_value
         target:
           entity_id: __ENTITY_ID__
         data:
-          value: "{{ msg }}"
+          value: "{{ msg_with_nonce }}"
     mode: restart
 """
         event_trigger_block = event_trigger_block.replace("__EVENT_ENTITY_ID__", event_entity_id)
@@ -453,7 +500,7 @@ def build_ha_package_yaml(cfg):
 
     body = body.replace("__API_BASE_URL__", api_base_url)
     body = body.replace("__ENTITY_ID__", entity_id)
-    body = body.replace("__SCHEDULE_TIME__", schedule_time)
+    body = body.replace("__SCHEDULE_TRIGGERS__", schedule_triggers_block)
     body = body.replace("__BROADCAST_TEMPLATE__", broadcast_template)
     body = body.replace("__WEEKDAYS_BLOCK__", weekdays_block)
     body = body.replace("__WECHAT_NOTIFY_BLOCK__", wechat_notify_block)

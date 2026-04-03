@@ -44,8 +44,7 @@ automation:
   - alias: 每日小爱播报花粉和空气质量
     id: daily_xiaoai_pollen_air_report
     trigger:
-      - platform: time
-        at: "__SCHEDULE_TIME__:00"
+__SCHEDULE_TRIGGERS__
 __WEEKDAYS_BLOCK__
     action:
       - service: homeassistant.update_entity
