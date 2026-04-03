@@ -222,8 +222,8 @@
             <input id="event_keywords" placeholder="天气,天气怎么样,今天天气怎么样" />
           </div>
           <div class="form-group">
-            <label>延迟播报分钟数</label>
-            <input id="event_delay_minutes" type="number" min="0" max="120" value="2" />
+            <label>延迟播报（秒或 HH:MM:SS）</label>
+            <input id="event_delay_display" placeholder="30 或 00:00:30" value="120" />
           </div>
         </section>
       </div>
@@ -333,7 +333,7 @@ function payload() {
     event_entity_id: document.getElementById('event_entity_id').value.trim(),
     event_attribute_name: document.getElementById('event_attribute_name').value.trim(),
     event_keywords: document.getElementById('event_keywords').value.trim(),
-    event_delay_minutes: document.getElementById('event_delay_minutes').value,
+    event_delay_display: document.getElementById('event_delay_display').value.trim(),
     event_broadcast_template: document.getElementById('event_broadcast_template').value,
   };
 }
@@ -365,7 +365,7 @@ function fill(data) {
   document.getElementById('event_entity_id').value = data.event_entity_id || 'sensor.xiaomi_lx06_e165_conversation';
   document.getElementById('event_attribute_name').value = data.event_attribute_name || 'content';
   document.getElementById('event_keywords').value = data.event_keywords || '天气,天气怎么样,今天天气怎么样';
-  document.getElementById('event_delay_minutes').value = data.event_delay_minutes ?? 2;
+  document.getElementById('event_delay_display').value = data.event_delay_display || String(data.event_delay_seconds ?? 120);
   document.getElementById('event_broadcast_template').value = data.event_broadcast_template || '';
 
   const badge = document.getElementById('tokenBadge');

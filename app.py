@@ -63,7 +63,8 @@ DEFAULT_UI_CONFIG = {
     "event_entity_id": "sensor.xiaomi_lx06_e165_conversation",
     "event_attribute_name": "content",
     "event_keywords": "天气,天气怎么样,今天天气怎么样",
-    "event_delay_minutes": 2,
+    "event_delay_seconds": 120,
+    "event_delay_display": "120",
     "event_broadcast_template": "当前实时花粉情况是，{city}花粉风险{pollen_level}，花粉数值{pollen_score}。{pollen_message} {window_advice}{mask_advice}",
     "wechat_push_enabled": False,
     "wechat_notify_service": "",
@@ -313,6 +314,34 @@ def read_helpers_from_ha(cfg):
     return result
 
 
+def parse_delay_to_seconds(value, fallback=120):
+    if value in (None, ""):
+        return fallback, str(fallback)
+    raw = str(value).strip()
+    if not raw:
+        return fallback, str(fallback)
+    if ":" in raw:
+        parts = raw.split(":")
+        try:
+            if len(parts) == 2:
+                mm, ss = [int(x) for x in parts]
+                total = mm * 60 + ss
+            elif len(parts) == 3:
+                hh, mm, ss = [int(x) for x in parts]
+                total = hh * 3600 + mm * 60 + ss
+            else:
+                raise ValueError("bad delay format")
+        except Exception:
+            total = fallback
+    else:
+        try:
+            total = int(float(raw))
+        except Exception:
+            total = fallback
+    total = max(0, min(total, 24 * 3600))
+    return total, raw
+
+
 def sanitize_ui_payload(data, current=None):
     current = current or load_ui_config()
     cleaned = current.copy()
@@ -332,14 +361,14 @@ def sanitize_ui_payload(data, current=None):
     cleaned["event_entity_id"] = str((data.get("event_entity_id") or current.get("event_entity_id") or DEFAULT_UI_CONFIG["event_entity_id"])).strip()
     cleaned["event_attribute_name"] = str((data.get("event_attribute_name") or current.get("event_attribute_name") or DEFAULT_UI_CONFIG["event_attribute_name"])).strip()
     cleaned["event_keywords"] = str((data.get("event_keywords") or current.get("event_keywords") or DEFAULT_UI_CONFIG["event_keywords"])).strip()
-    delay_minutes = data.get("event_delay_minutes")
-    if delay_minutes in (None, ""):
-        delay_minutes = current.get("event_delay_minutes") or DEFAULT_UI_CONFIG["event_delay_minutes"]
-    try:
-        delay_minutes = int(delay_minutes)
-    except Exception:
-        delay_minutes = DEFAULT_UI_CONFIG["event_delay_minutes"]
-    cleaned["event_delay_minutes"] = max(0, min(delay_minutes, 120))
+    delay_input = data.get("event_delay_seconds")
+    if delay_input in (None, ""):
+        delay_input = data.get("event_delay_display")
+    if delay_input in (None, ""):
+        delay_input = current.get("event_delay_display") or current.get("event_delay_seconds") or DEFAULT_UI_CONFIG["event_delay_seconds"]
+    delay_seconds, delay_display = parse_delay_to_seconds(delay_input, fallback=int(current.get("event_delay_seconds") or DEFAULT_UI_CONFIG["event_delay_seconds"]))
+    cleaned["event_delay_seconds"] = delay_seconds
+    cleaned["event_delay_display"] = str(delay_display)
     cleaned["event_broadcast_template"] = str((data.get("event_broadcast_template") or current.get("event_broadcast_template") or DEFAULT_UI_CONFIG["event_broadcast_template"])).strip()
     cleaned["wechat_push_enabled"] = bool(data.get("wechat_push_enabled"))
     cleaned["wechat_notify_service"] = str((data.get("wechat_notify_service") or current.get("wechat_notify_service") or "")).strip()
@@ -440,17 +469,18 @@ def build_ha_package_yaml(cfg):
         event_entity_id = cfg.get("event_entity_id") or DEFAULT_UI_CONFIG["event_entity_id"]
         event_attribute_name = cfg.get("event_attribute_name") or DEFAULT_UI_CONFIG["event_attribute_name"]
         event_template = convert_format_template_to_ha(cfg.get("event_broadcast_template") or DEFAULT_UI_CONFIG["event_broadcast_template"])
-        raw_delay = cfg.get("event_delay_minutes")
+        raw_delay = cfg.get("event_delay_seconds")
         if raw_delay in (None, ""):
-            raw_delay = DEFAULT_UI_CONFIG["event_delay_minutes"]
+            raw_delay = DEFAULT_UI_CONFIG["event_delay_seconds"]
         try:
             event_delay = int(raw_delay)
         except Exception:
-            event_delay = DEFAULT_UI_CONFIG["event_delay_minutes"]
-        event_delay = max(0, min(event_delay, 120))
-        delay_h = event_delay // 60
-        delay_m = event_delay % 60
-        event_delay_hms = f"{delay_h:02d}:{delay_m:02d}:00"
+            event_delay = DEFAULT_UI_CONFIG["event_delay_seconds"]
+        event_delay = max(0, min(event_delay, 24 * 3600))
+        delay_h = event_delay // 3600
+        delay_m = (event_delay % 3600) // 60
+        delay_s = event_delay % 60
+        event_delay_hms = f"{delay_h:02d}:{delay_m:02d}:{delay_s:02d}"
         keywords = [k.strip() for k in str(cfg.get("event_keywords") or DEFAULT_UI_CONFIG["event_keywords"]).split(",") if k.strip()]
         event_keywords_list = "[" + ", ".join(json.dumps(k, ensure_ascii=False) for k in keywords) + "]"
         event_trigger_block = """
