@@ -59,6 +59,9 @@ DEFAULT_UI_CONFIG = {
     "schedule_time_3": "00:00",
     "workdays_only": False,
     "broadcast_template": "早上好，{city}今天花粉风险{pollen_level}，花粉数值{pollen_score}。{pollen_message} 空气质量{air_category_cn}，AQI {aqi}。{window_advice}{mask_advice}",
+    "wechat_push_enabled": False,
+    "wechat_push_webhook": "",
+    "wechat_push_title": "花粉空气播报",
 }
 
 
@@ -140,6 +143,33 @@ def call_home_assistant_service(cfg, message):
         json={"entity_id": entity_id, "value": message},
         timeout=REQUEST_TIMEOUT,
     )
+    resp.raise_for_status()
+    try:
+        return resp.json()
+    except Exception:
+        return {"status": resp.status_code, "text": resp.text}
+
+
+def call_wechat_push(cfg, message):
+    if not cfg.get("wechat_push_enabled"):
+        return {"enabled": False, "skipped": True}
+    webhook = (cfg.get("wechat_push_webhook") or "").strip()
+    title = (cfg.get("wechat_push_title") or "花粉空气播报").strip()
+    if not webhook:
+        raise ValueError("wechat_push_webhook is required when wechat_push_enabled is true")
+
+    if "sctapi.ftqq.com" in webhook or "sc.ftqq.com" in webhook:
+        resp = requests.post(webhook, data={"title": title, "desp": message}, timeout=REQUEST_TIMEOUT)
+    elif "pushplus.plus" in webhook:
+        resp = requests.post(webhook, json={"title": title, "content": message, "template": "txt"}, timeout=REQUEST_TIMEOUT)
+    elif "qyapi.weixin.qq.com" in webhook:
+        resp = requests.post(
+            webhook,
+            json={"msgtype": "text", "text": {"content": title + "\n" + message}},
+            timeout=REQUEST_TIMEOUT,
+        )
+    else:
+        resp = requests.post(webhook, json={"title": title, "content": message}, timeout=REQUEST_TIMEOUT)
     resp.raise_for_status()
     try:
         return resp.json()
@@ -277,6 +307,9 @@ def sanitize_ui_payload(data, current=None):
     cleaned["schedule_time_3"] = str((data.get("schedule_time_3") or current.get("schedule_time_3") or "00:00")).strip()[:5]
     cleaned["workdays_only"] = bool(data.get("workdays_only"))
     cleaned["broadcast_template"] = str((data.get("broadcast_template") or current.get("broadcast_template") or DEFAULT_UI_CONFIG["broadcast_template"])).strip()
+    cleaned["wechat_push_enabled"] = bool(data.get("wechat_push_enabled"))
+    cleaned["wechat_push_webhook"] = str((data.get("wechat_push_webhook") or current.get("wechat_push_webhook") or "")).strip()
+    cleaned["wechat_push_title"] = str((data.get("wechat_push_title") or current.get("wechat_push_title") or "花粉空气播报")).strip()
     return cleaned
 
 
@@ -972,8 +1005,9 @@ def api_ui_test_broadcast():
     try:
         payload = fetch_current_payload_for_ui(cfg)
         message = build_broadcast_message(payload, cfg)
-        result = call_home_assistant_service(cfg, message)
-        return jsonify({"ok": True, "message": message, "result": result})
+        voice_result = call_home_assistant_service(cfg, message)
+        wechat_result = call_wechat_push(cfg, message)
+        return jsonify({"ok": True, "message": message, "result": {"voice": voice_result, "wechat": wechat_result}})
     except Exception as e:
         return jsonify({"ok": False, "error": "broadcast test failed", "message": str(e)}), 400
 

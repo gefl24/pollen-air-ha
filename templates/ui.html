@@ -157,6 +157,20 @@
             <label>小爱 TTS 实体 ID</label>
             <input id="xiaoai_entity_id" placeholder="text.xiaomi_lx06_e165_play_text" />
           </div>
+          <div class="form-group">
+            <label class="checkbox-group">
+              <input id="wechat_push_enabled" type="checkbox" />
+              <span>启用微信文字推送</span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label>微信推送标题</label>
+            <input id="wechat_push_title" placeholder="花粉空气播报" />
+          </div>
+          <div class="form-group">
+            <label>微信推送 Webhook</label>
+            <input id="wechat_push_webhook" placeholder="支持 Server酱 / PushPlus / 企业微信机器人" />
+          </div>
         </section>
 
         <section class="card">
@@ -204,7 +218,7 @@
           <h2><span>⚡</span> 快速操作</h2>
           <div class="actions-grid">
             <button class="btn-primary" onclick="saveConfig()">保存配置</button>
-            <button class="btn-ghost" onclick="testBroadcast()">语音测试</button>
+            <button class="btn-ghost" onclick="testBroadcast()">语音+微信测试</button>
             <button class="btn-ghost" onclick="syncHelpers()">同步到 HA</button>
             <button class="btn-ghost" onclick="checkHaStatus()">检查连接</button>
             <button class="btn-ghost" onclick="readHelpers()">读取 Helper</button>
@@ -257,6 +271,9 @@ function payload() {
     ha_base_url: document.getElementById('ha_base_url').value.trim(),
     ha_token: document.getElementById('ha_token').value,
     xiaoai_entity_id: document.getElementById('xiaoai_entity_id').value.trim(),
+    wechat_push_enabled: document.getElementById('wechat_push_enabled').checked,
+    wechat_push_title: document.getElementById('wechat_push_title').value.trim(),
+    wechat_push_webhook: document.getElementById('wechat_push_webhook').value.trim(),
     schedule_enabled: document.getElementById('schedule_enabled').checked,
     schedule_time: document.getElementById('schedule_time').value,
     schedule_time_2: document.getElementById('schedule_time_2').value,
@@ -280,6 +297,9 @@ function fill(data) {
   document.getElementById('ha_base_url').value = data.ha_base_url || '';
   document.getElementById('ha_token').value = '';
   document.getElementById('xiaoai_entity_id').value = data.xiaoai_entity_id || '';
+  document.getElementById('wechat_push_enabled').checked = !!data.wechat_push_enabled;
+  document.getElementById('wechat_push_title').value = data.wechat_push_title || '花粉空气播报';
+  document.getElementById('wechat_push_webhook').value = data.wechat_push_webhook || '';
   document.getElementById('schedule_enabled').checked = !!data.schedule_enabled;
   document.getElementById('schedule_time').value = data.schedule_time || '07:30';
   document.getElementById('schedule_time_2').value = data.schedule_time_2 || '00:00';
