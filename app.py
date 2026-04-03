@@ -58,6 +58,9 @@ DEFAULT_UI_CONFIG = {
     "schedule_time_2": "00:00",
     "schedule_time_3": "00:00",
     "workdays_only": False,
+    "quiet_hours_enabled": False,
+    "allowed_start_time": "07:00",
+    "allowed_end_time": "21:00",
     "broadcast_template": "早上好，{city}今天花粉风险{pollen_level}，花粉数值{pollen_score}。{pollen_message} 空气质量{air_category_cn}，AQI {aqi}。{window_advice}{mask_advice}",
     "event_trigger_enabled": False,
     "event_entity_id": "sensor.xiaomi_lx06_e165_conversation",
@@ -356,6 +359,9 @@ def sanitize_ui_payload(data, current=None):
     cleaned["schedule_time_2"] = str((data.get("schedule_time_2") or current.get("schedule_time_2") or "00:00")).strip()[:5]
     cleaned["schedule_time_3"] = str((data.get("schedule_time_3") or current.get("schedule_time_3") or "00:00")).strip()[:5]
     cleaned["workdays_only"] = bool(data.get("workdays_only"))
+    cleaned["quiet_hours_enabled"] = bool(data.get("quiet_hours_enabled"))
+    cleaned["allowed_start_time"] = str((data.get("allowed_start_time") or current.get("allowed_start_time") or "07:00")).strip()[:5]
+    cleaned["allowed_end_time"] = str((data.get("allowed_end_time") or current.get("allowed_end_time") or "21:00")).strip()[:5]
     cleaned["broadcast_template"] = str((data.get("broadcast_template") or current.get("broadcast_template") or DEFAULT_UI_CONFIG["broadcast_template"])).strip()
     cleaned["event_trigger_enabled"] = bool(data.get("event_trigger_enabled"))
     cleaned["event_entity_id"] = str((data.get("event_entity_id") or current.get("event_entity_id") or DEFAULT_UI_CONFIG["event_entity_id"])).strip()
@@ -443,10 +449,9 @@ def build_ha_package_yaml(cfg):
 
     broadcast_template = convert_format_template_to_ha(cfg.get("broadcast_template") or DEFAULT_UI_CONFIG["broadcast_template"])
 
-    weekdays_block = ""
+    condition_blocks = []
     if cfg.get("workdays_only"):
-        weekdays_block = (
-            "    condition:\n"
+        condition_blocks.append(
             "      - condition: time\n"
             "        weekday:\n"
             "          - mon\n"
@@ -455,6 +460,17 @@ def build_ha_package_yaml(cfg):
             "          - thu\n"
             "          - fri"
         )
+    if cfg.get("quiet_hours_enabled"):
+        start_time = str(cfg.get("allowed_start_time") or DEFAULT_UI_CONFIG["allowed_start_time"]).strip()[:5]
+        end_time = str(cfg.get("allowed_end_time") or DEFAULT_UI_CONFIG["allowed_end_time"]).strip()[:5]
+        condition_blocks.append(
+            "      - condition: time\n"
+            f"        after: \"{start_time}:00\"\n"
+            f"        before: \"{end_time}:00\""
+        )
+    condition_block = ""
+    if condition_blocks:
+        condition_block = "    condition:\n" + "\n".join(condition_blocks)
 
     wechat_notify_block = ""
     if cfg.get("wechat_push_enabled") and (cfg.get("wechat_push_webhook") or "").strip():
@@ -497,7 +513,7 @@ __EVENT_ATTRIBUTE_TRIGGER__
             {{ state_attr('__EVENT_ENTITY_ID__', '__EVENT_ATTRIBUTE_NAME__') or trigger.to_state.state or '' }}
           spoken_text_lc: "{{ spoken_text | lower }}"
           trigger_keywords: __EVENT_KEYWORDS__
-      - condition: template
+__EVENT_TIME_CONDITION__      - condition: template
         value_template: >-
           {{ spoken_text_lc not in ['', 'unknown', 'unavailable', 'none'] }}
       - condition: template
@@ -528,9 +544,19 @@ __EVENT_ATTRIBUTE_TRIGGER__
         event_attribute_trigger = ""
         if event_attribute_name:
             event_attribute_trigger = f"        attribute: {event_attribute_name}"
+        event_time_condition = ""
+        if cfg.get("quiet_hours_enabled"):
+            start_time = str(cfg.get("allowed_start_time") or DEFAULT_UI_CONFIG["allowed_start_time"]).strip()[:5]
+            end_time = str(cfg.get("allowed_end_time") or DEFAULT_UI_CONFIG["allowed_end_time"]).strip()[:5]
+            event_time_condition = (
+                "      - condition: time\n"
+                f"        after: \"{start_time}:00\"\n"
+                f"        before: \"{end_time}:00\"\n"
+            )
         event_trigger_block = event_trigger_block.replace("__EVENT_ENTITY_ID__", event_entity_id)
         event_trigger_block = event_trigger_block.replace("__EVENT_ATTRIBUTE_NAME__", event_attribute_name)
         event_trigger_block = event_trigger_block.replace("__EVENT_ATTRIBUTE_TRIGGER__", event_attribute_trigger)
+        event_trigger_block = event_trigger_block.replace("__EVENT_TIME_CONDITION__", event_time_condition)
         event_trigger_block = event_trigger_block.replace("__EVENT_KEYWORDS__", event_keywords_list)
         event_trigger_block = event_trigger_block.replace("__EVENT_DELAY_HMS__", event_delay_hms)
         event_trigger_block = event_trigger_block.replace("__EVENT_BROADCAST_TEMPLATE__", event_template)
@@ -540,7 +566,7 @@ __EVENT_ATTRIBUTE_TRIGGER__
     body = body.replace("__ENTITY_ID__", entity_id)
     body = body.replace("__SCHEDULE_TRIGGERS__", schedule_triggers_block)
     body = body.replace("__BROADCAST_TEMPLATE__", broadcast_template)
-    body = body.replace("__WEEKDAYS_BLOCK__", weekdays_block)
+    body = body.replace("__CONDITION_BLOCK__", condition_block)
     body = body.replace("__WECHAT_NOTIFY_BLOCK__", wechat_notify_block)
     body = body.replace("__EVENT_TRIGGER_BLOCK__", event_trigger_block)
     return body

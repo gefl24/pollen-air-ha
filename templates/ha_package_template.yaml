@@ -45,7 +45,7 @@ automation:
     id: daily_xiaoai_pollen_air_report
     trigger:
 __SCHEDULE_TRIGGERS__
-__WEEKDAYS_BLOCK__
+__CONDITION_BLOCK__
     action:
       - service: homeassistant.update_entity
         target:
