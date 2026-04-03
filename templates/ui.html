@@ -361,11 +361,20 @@ async function saveConfig(opts = {}) {
 }
 
 async function testBroadcast() {
-  show('正在请求语音测试...');
+  show('正在请求语音+微信测试...');
+  const saved = await saveConfig({ silent: true });
+  if (!saved) return;
   const res = await fetch('/api/ui/test-broadcast', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload()) });
   const data = await res.json();
-  if (!res.ok) return show('测试失败', false);
-  show('语音指令发送成功');
+  if (!res.ok) {
+    const err = data.errors ? JSON.stringify(data.errors) : (data.message || '测试失败');
+    return show('测试失败：' + err, false);
+  }
+  const parts = [];
+  if (data.result && data.result.voice) parts.push('语音成功');
+  if (data.result && data.result.wechat && !data.result.wechat.skipped) parts.push('企微成功');
+  if (data.result && data.result.wechat && data.result.wechat.skipped) parts.push('企微未启用');
+  show(parts.length ? parts.join('，') : '测试已发送');
 }
 
 async function previewPackage(opts = {}) {
