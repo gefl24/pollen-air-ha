@@ -366,15 +366,27 @@ async function testBroadcast() {
   if (!saved) return;
   const res = await fetch('/api/ui/test-broadcast', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload()) });
   const data = await res.json();
-  if (!res.ok) {
-    const err = data.errors ? JSON.stringify(data.errors) : (data.message || '测试失败');
-    return show('测试失败：' + err, false);
-  }
+
   const parts = [];
-  if (data.result && data.result.voice) parts.push('语音成功');
-  if (data.result && data.result.wechat && !data.result.wechat.skipped) parts.push('企微成功');
-  if (data.result && data.result.wechat && data.result.wechat.skipped) parts.push('企微未启用');
-  show(parts.length ? parts.join('，') : '测试已发送');
+  if (data.result && data.result.voice) {
+    parts.push('语音成功');
+  } else if (data.errors && data.errors.voice) {
+    parts.push('语音失败：' + data.errors.voice);
+  }
+
+  if (data.result && data.result.wechat && data.result.wechat.skipped) {
+    parts.push('企微未启用');
+  } else if (data.result && data.result.wechat) {
+    parts.push('企微成功');
+  } else if (data.errors && data.errors.wechat) {
+    parts.push('企微失败：' + data.errors.wechat);
+  }
+
+  if (!res.ok) {
+    return show(parts.length ? parts.join('；') : ('测试失败：' + (data.message || '未知错误')), false);
+  }
+
+  show(parts.length ? parts.join('；') : '测试已发送');
 }
 
 async function previewPackage(opts = {}) {
