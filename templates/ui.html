@@ -256,7 +256,9 @@
         <section class="card">
           <h2><span>⚡</span> 快速操作</h2>
           <div class="actions-grid">
-            <button class="btn-primary" onclick="saveConfig()">保存配置</button>
+            <button class="btn-primary" onclick="saveConfig({ refreshPreview: true })">保存配置</button>
+            <button class="btn-ghost" onclick="previewPackage()">生成 Package YAML</button>
+            <button class="btn-ghost" onclick="previewHelperPackage()">生成 Helper YAML</button>
             <button class="btn-ghost" onclick="testBroadcast()">语音+微信测试</button>
             <button class="btn-ghost" onclick="syncHelpers()">同步到 HA</button>
             <button class="btn-ghost" onclick="checkHaStatus()">检查连接</button>
@@ -388,12 +390,14 @@ async function checkHaStatus() {
 // ... 保持你原有的 fetch 逻辑函数 (loadConfig, saveConfig, testBroadcast 等) ...
 // 记得在这些函数最后调用 checkHaStatus() 来更新 UI
 
-async function loadConfig() {
+async function loadConfig(opts = {}) {
   const res = await fetch('/api/ui/config');
   const data = await res.json();
   if (!res.ok) return show(data.error || '读取失败', false);
   fill(data);
-  show('配置已加载');
+  await previewPackage({ silent: true, skipSave: true });
+  await previewHelperPackage({ silent: true, skipSave: true });
+  if (!opts.silent) show('配置已加载');
 }
 
 async function saveConfig(opts = {}) {
@@ -444,27 +448,39 @@ async function testBroadcast() {
 
 async function previewPackage(opts = {}) {
   const currentTemplate = document.getElementById('broadcast_template').value;
+  const currentEventTemplate = document.getElementById('event_broadcast_template').value;
   if (!opts.skipSave) {
     const saved = await saveConfig({ silent: true });
     if (!saved) return;
   }
   const res = await fetch('/api/ui/package-preview');
+  if (!res.ok) {
+    const text = await res.text();
+    return show(text || 'Package YAML 生成失败', false);
+  }
   const text = await res.text();
   document.getElementById('packagePreview').value = text;
   document.getElementById('broadcast_template').value = currentTemplate;
-  if (!opts.silent) show('HA 配置已生成，直接复制就行');
+  document.getElementById('event_broadcast_template').value = currentEventTemplate;
+  if (!opts.silent) show('Package YAML 已生成，直接复制就行');
 }
 
 async function previewHelperPackage(opts = {}) {
   const currentTemplate = document.getElementById('broadcast_template').value;
+  const currentEventTemplate = document.getElementById('event_broadcast_template').value;
   if (!opts.skipSave) {
     const saved = await saveConfig({ silent: true });
     if (!saved) return;
   }
   const res = await fetch('/api/ui/helper-package-preview');
+  if (!res.ok) {
+    const text = await res.text();
+    return show(text || 'Helper YAML 生成失败', false);
+  }
   const text = await res.text();
   document.getElementById('helperYamlPreview').value = text;
   document.getElementById('broadcast_template').value = currentTemplate;
+  document.getElementById('event_broadcast_template').value = currentEventTemplate;
   if (!opts.silent) show('Helper YAML 已生成');
 }
 

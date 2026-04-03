@@ -101,8 +101,8 @@ docker pull ghcr.io/gefl24/pollen-air-ha:latest
 - 立即测试 **微信文字推送**
 - 读取 / 同步 HA Helper
 - 检查 HA 连接状态
-- 生成 Home Assistant Package YAML
-- 生成 Helper YAML
+- 生成 Home Assistant Package YAML（支持页面内一键预览 / 复制）
+- 生成 Helper YAML（支持页面内一键预览 / 复制）
 
 ### 控制台配置持久化
 
