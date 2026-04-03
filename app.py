@@ -460,12 +460,16 @@ def build_ha_package_yaml(cfg):
     trigger:
       - platform: state
         entity_id: __EVENT_ENTITY_ID__
+__EVENT_ATTRIBUTE_TRIGGER__
     action:
       - variables:
           spoken_text: >-
             {{ state_attr('__EVENT_ENTITY_ID__', '__EVENT_ATTRIBUTE_NAME__') or trigger.to_state.state or '' }}
           spoken_text_lc: "{{ spoken_text | lower }}"
           trigger_keywords: __EVENT_KEYWORDS__
+      - condition: template
+        value_template: >-
+          {{ spoken_text_lc not in ['', 'unknown', 'unavailable', 'none'] }}
       - condition: template
         value_template: >-
           {{ trigger_keywords | select('in', spoken_text_lc) | list | count > 0 }}
@@ -491,8 +495,12 @@ def build_ha_package_yaml(cfg):
           value: "{{ msg_with_nonce }}"
     mode: restart
 """
+        event_attribute_trigger = ""
+        if event_attribute_name:
+            event_attribute_trigger = f"        attribute: {event_attribute_name}"
         event_trigger_block = event_trigger_block.replace("__EVENT_ENTITY_ID__", event_entity_id)
         event_trigger_block = event_trigger_block.replace("__EVENT_ATTRIBUTE_NAME__", event_attribute_name)
+        event_trigger_block = event_trigger_block.replace("__EVENT_ATTRIBUTE_TRIGGER__", event_attribute_trigger)
         event_trigger_block = event_trigger_block.replace("__EVENT_KEYWORDS__", event_keywords_list)
         event_trigger_block = event_trigger_block.replace("__EVENT_DELAY_HMS__", event_delay_hms)
         event_trigger_block = event_trigger_block.replace("__EVENT_BROADCAST_TEMPLATE__", event_template)
