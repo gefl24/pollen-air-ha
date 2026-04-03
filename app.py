@@ -155,22 +155,30 @@ def call_wechat_push(cfg, message):
     if not cfg.get("wechat_push_enabled"):
         return {"enabled": False, "skipped": True}
     webhook = (cfg.get("wechat_push_webhook") or "").strip()
+    proxy_url = (cfg.get("wechat_push_proxy_url") or "").strip()
     title = (cfg.get("wechat_push_title") or "花粉空气播报").strip()
-    if not webhook:
-        raise ValueError("wechat_push_webhook is required when wechat_push_enabled is true")
 
-    if "sctapi.ftqq.com" in webhook or "sc.ftqq.com" in webhook:
-        resp = requests.post(webhook, data={"title": title, "desp": message}, timeout=REQUEST_TIMEOUT)
-    elif "pushplus.plus" in webhook:
-        resp = requests.post(webhook, json={"title": title, "content": message, "template": "txt"}, timeout=REQUEST_TIMEOUT)
-    elif "qyapi.weixin.qq.com" in webhook:
+    if proxy_url:
         resp = requests.post(
-            webhook,
-            json={"msgtype": "text", "text": {"content": title + "\n" + message}},
+            proxy_url,
+            json={"title": title, "content": message, "webhook": webhook},
             timeout=REQUEST_TIMEOUT,
         )
     else:
-        resp = requests.post(webhook, json={"title": title, "content": message}, timeout=REQUEST_TIMEOUT)
+        if not webhook:
+            raise ValueError("wechat_push_webhook is required when wechat_push_enabled is true")
+        if "sctapi.ftqq.com" in webhook or "sc.ftqq.com" in webhook:
+            resp = requests.post(webhook, data={"title": title, "desp": message}, timeout=REQUEST_TIMEOUT)
+        elif "pushplus.plus" in webhook:
+            resp = requests.post(webhook, json={"title": title, "content": message, "template": "txt"}, timeout=REQUEST_TIMEOUT)
+        elif "qyapi.weixin.qq.com" in webhook:
+            resp = requests.post(
+                webhook,
+                json={"msgtype": "text", "text": {"content": title + "\n" + message}},
+                timeout=REQUEST_TIMEOUT,
+            )
+        else:
+            resp = requests.post(webhook, json={"title": title, "content": message}, timeout=REQUEST_TIMEOUT)
     resp.raise_for_status()
     try:
         return resp.json()
@@ -1019,11 +1027,31 @@ def api_ui_test_broadcast():
     try:
         payload = fetch_current_payload_for_ui(cfg)
         message = build_broadcast_message(payload, cfg)
-        voice_result = call_home_assistant_service(cfg, message)
-        wechat_result = call_wechat_push(cfg, message)
-        return jsonify({"ok": True, "message": message, "result": {"voice": voice_result, "wechat": wechat_result}})
     except Exception as e:
-        return jsonify({"ok": False, "error": "broadcast test failed", "message": str(e)}), 400
+        return jsonify({"ok": False, "error": "broadcast data failed", "message": str(e)}), 400
+
+    voice_result = None
+    wechat_result = None
+    errors = {}
+
+    try:
+        voice_result = call_home_assistant_service(cfg, message)
+    except Exception as e:
+        errors["voice"] = str(e)
+
+    try:
+        wechat_result = call_wechat_push(cfg, message)
+    except Exception as e:
+        errors["wechat"] = str(e)
+
+    ok = not errors or bool(voice_result) or bool(wechat_result)
+    status = 200 if ok else 400
+    return jsonify({
+        "ok": ok,
+        "message": message,
+        "result": {"voice": voice_result, "wechat": wechat_result},
+        "errors": errors,
+    }), status
 
 
 @app.route("/api/ui/package-preview", methods=["GET"])
