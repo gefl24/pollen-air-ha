@@ -191,7 +191,8 @@ homeassistant:
 
 如果 HA 中还没有这些 Helper，可以先通过控制台生成 `Helper YAML`。
 
-* 📚 **[Home Assistant 对接说明](docs/HOME_ASSISTANT.md)**（完整接入步骤）
+* 📚 **[Home Assistant 对接说明（英文）](docs/HOME_ASSISTANT.md)**
+* 📚 **[Home Assistant 对接详细操作手册（中文）](docs/HOME_ASSISTANT.zh-CN.md)**
 * 📄 **[示例 Package 配置](examples/home-assistant/packages/pollen_air.yaml)**（可直接参考抄配置，已适配 `configuration.yaml` 的 `packages: !include_dir_named packages` 写法，并包含小爱音箱 `text.xiaomi_lx06_e165_play_text` 播报示例）
 
 如果后面还要继续优化，可以再往后端补一层“风险等级 / 开窗建议 / 过敏提醒”这种摘要字段，HA 端会更省心。

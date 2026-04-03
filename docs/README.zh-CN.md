@@ -48,9 +48,13 @@ curl http://localhost:8080/api/ha/current
 详细文档见：
 
 - `docs/HOME_ASSISTANT.md`
+- `docs/HOME_ASSISTANT.zh-CN.md`
 - `examples/home-assistant/packages/pollen_air.yaml`
 
-如果你只是想尽快接入 HA，优先看这两个文件就够了。
+如果你只是想尽快接入 HA：
+
+- 想看完整步骤，优先看 `docs/HOME_ASSISTANT.zh-CN.md`
+- 想直接抄配置，优先看 `examples/home-assistant/packages/pollen_air.yaml`
 
 ## 适合谁用
 
